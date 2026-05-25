@@ -1,90 +1,131 @@
 # ============================================================================ #
-#          DarwinCheck Vol.1 - Auditoría Taxonómica y Geográfica             #
-#                         MÓDULO: COORDENADAS                                #
+#              DarwinCheck - Validación y Conversión de Coordenadas            #
 # ============================================================================ #
 
-from typing import Optional, Tuple
+import pandas as pd
 import numpy as np
-from modules.utils import gms_a_decimal, format_coordinate
-from modules.config import CHILE_BOUNDS
+from modules.config import CHILE_CONTINENTAL, RAPA_NUI, JUAN_FERNANDEZ
+from modules.utils import gms_a_decimal, es_vacio
 
-class CoordinateValidator:
-    """
-    Validador de coordenadas geográficas para Chile
-    """
+class ValidadorCoordenadas:
+    """Valida y convierte coordenadas geográficas."""
     
     @staticmethod
-    def validar_coordenada_chile(lat: str, lon: str) -> Tuple[str, Optional[str]]:
-        """
-        Valida si una coordenada está dentro de Chile (continental, islas)
+    def es_decimal(coord_str):
+        """Verifica si coordenada está en formato decimal."""
+        if es_vacio(coord_str):
+            return False
         
-        Args:
-            lat: Latitud (string o número)
-            lon: Longitud (string o número)
-            
-        Returns:
-            (estado_str, ubicacion)
-            - estado_str: "✅ OK (...)" o "❌ Error (...)"
-            - ubicacion: Descripción de la zona (continental, Rapa Nui, etc.)
-        """
-        
-        if not lat or not lon:
-            return "❌ Coordenada faltante", None
-        
-        # Convertir a decimal
-        lat_num = gms_a_decimal(lat)
-        lon_num = gms_a_decimal(lon)
-        
-        if lat_num is None or lon_num is None:
-            return "❌ Formato inválido", None
-        
-        # Validar rango general
-        if lat_num < -90 or lat_num > 90 or lon_num < -180 or lon_num > 180:
-            return "❌ Coordenadas fuera de rango", None
-        
-        # Chile continental
-        bounds = CHILE_BOUNDS['continental']
-        if (bounds['lat_min'] <= lat_num <= bounds['lat_max'] and
-            bounds['lon_min'] <= lon_num <= bounds['lon_max']):
-            return "✅ OK (Chile continental)", "Chile continental"
-        
-        # Rapa Nui
-        rapa_nui = CHILE_BOUNDS['rapa_nui']
-        if (abs(lat_num - rapa_nui['lat']) < rapa_nui['tolerance'] and
-            abs(lon_num - rapa_nui['lon']) < rapa_nui['tolerance']):
-            return "✅ OK (Rapa Nui)", "Rapa Nui"
-        
-        # Juan Fernández
-        jf = CHILE_BOUNDS['juan_fernandez']
-        if (abs(lat_num - jf['lat']) < jf['tolerance'] and
-            abs(lon_num - jf['lon']) < jf['tolerance']):
-            return "✅ OK (Juan Fernández)", "Juan Fernández"
-        
-        # Fuera de Chile
-        return "❌ Fuera de Chile / Mar", None
+        try:
+            float(str(coord_str).replace(',', '.'))
+            return True
+        except:
+            return False
     
     @staticmethod
-    def procesar_coordenadas(df_col) -> list:
-        """
-        Procesa columna de coordenadas (GMS -> decimal)
+    def convertir_a_decimal(lat_str, lon_str):
+        """Convierte coordenadas a decimal (si es necesario)."""
         
-        Args:
-            df_col: Pandas Series con coordenadas
+        # Intentar como decimal primero
+        try:
+            if ValidadorCoordenadas.es_decimal(lat_str):
+                lat = float(str(lat_str).replace(',', '.'))
+            else:
+                lat = gms_a_decimal(lat_str)
+                if lat is None:
+                    return None, None
             
-        Returns:
-            Lista de coordenadas formateadas
-        """
-        resultado = []
+            if ValidadorCoordenadas.es_decimal(lon_str):
+                lon = float(str(lon_str).replace(',', '.'))
+            else:
+                lon = gms_a_decimal(lon_str)
+                if lon is None:
+                    return None, None
+            
+            return lat, lon
         
-        for coord in df_col:
-            try:
-                num = gms_a_decimal(coord)
-                if num is not None:
-                    formateado = format_coordinate(num)
-                    resultado.append(formateado)
-                else:
-                    resultado.append(None)
-            except:
-                resultado.append(None)
+        except:
+            return None, None
+    
+    @staticmethod
+    def validar_rango_global(lat, lon):
+        """Valida si coordenadas están en rango global válido."""
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            return -90 <= lat <= 90 and -180 <= lon <= 180
+        except:
+            return False
+    
+    @staticmethod
+    def en_chile_continental(lat, lon):
+        """Verifica si punto está en Chile continental."""
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            
+            chile = CHILE_CONTINENTAL
+            return (
+                chile['lat_min'] <= lat <= chile['lat_max'] and
+                chile['lon_min'] <= lon <= chile['lon_max']
+            )
+        except:
+            return False
+    
+    @staticmethod
+    def en_rapa_nui(lat, lon):
+        """Verifica si punto está cerca de Rapa Nui."""
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            
+            rn = RAPA_NUI
+            dist = np.sqrt(
+                (lat - rn['lat'])**2 + (lon - rn['lon'])**2
+            )
+            return dist <= rn['tolerancia']
+        except:
+            return False
+    
+    @staticmethod
+    def en_juan_fernandez(lat, lon):
+        """Verifica si punto está cerca de Juan Fernández."""
+        try:
+            lat = float(lat)
+            lon = float(lon)
+            
+            jf = JUAN_FERNANDEZ
+            dist = np.sqrt(
+                (lat - jf['lat'])**2 + (lon - jf['lon'])**2
+            )
+            return dist <= jf['tolerancia']
+        except:
+            return False
+    
+    @staticmethod
+    def validar_chile(lat, lon):
+        """Verifica si punto está en territorio chileno."""
+        return (
+            ValidadorCoordenadas.en_chile_continental(lat, lon) or
+            ValidadorCoordenadas.en_rapa_nui(lat, lon) or
+            ValidadorCoordenadas.en_juan_fernandez(lat, lon)
+        )
+    
+    @staticmethod
+    def obtener_estado_geografico(lat, lon):
+        """Obtiene estado geográfico del punto."""
+        if not ValidadorCoordenadas.validar_rango_global(lat, lon):
+            return "FUERA_RANGO_GLOBAL"
         
-        return resultado
+        if ValidadorCoordenadas.en_chile_continental(lat, lon):
+            return "CHILE_CONTINENTAL"
+        elif ValidadorCoordenadas.en_rapa_nui(lat, lon):
+            return "RAPA_NUI"
+        elif ValidadorCoordenadas.en_juan_fernandez(lat, lon):
+            return "JUAN_FERNANDEZ"
+        else:
+            return "FUERA_CHILE"
+
+
+# Instancia global
+validador = ValidadorCoordenadas()
