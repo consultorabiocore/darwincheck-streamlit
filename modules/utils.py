@@ -1,267 +1,216 @@
 # ============================================================================ #
-#                    DarwinCheck - Funciones Auxiliares                       #
+#                 DarwinCheck - Funciones Auxiliares Generales                 #
 # ============================================================================ #
 
+import pandas as pd
+import numpy as np
 import re
 import unicodedata
 from datetime import datetime
-import logging
 from pathlib import Path
-import numpy as np
-import pandas as pd
 from modules.config import LOGS_DIR
 
-# ==================== LOGGING ====================
-LOG_FILE = LOGS_DIR / f"darwincheck_{datetime.now().strftime('%Y%m%d')}.log"
+# ==================== UTILIDADES DE DATOS ====================
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-handler = logging.FileHandler(LOG_FILE)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
-
-def registrar_log(mensaje, nivel="INFO"):
-    """Registra mensaje en log."""
-    if nivel == "ERROR":
-        logger.error(mensaje)
-    elif nivel == "WARNING":
-        logger.warning(mensaje)
-    else:
-        logger.info(mensaje)
-
-
-# ==================== VALORES SEGUROS ====================
 def safe_val(x, default=""):
-    """Convierte valor a string seguro."""
-    if x is None or pd.isna(x):
+    """Retorna valor seguro, manejando nulos y valores especiales."""
+    if x is None or (isinstance(x, float) and pd.isna(x)):
         return default
-    
     x = str(x).strip()
-    
-    # Remover valores nulos conocidos
-    if x.lower() in ["na", "null", "n/a", "none", "nan"]:
+    if x.lower() in ['', 'na', 'null', 'none', 'nan']:
         return default
-    
-    if x == "":
-        return default
-    
     return x
 
 
-# ==================== NORMALIZACIÓN ====================
 def normalizar_texto(texto):
-    """Normaliza texto: remove acentos, espacios extras."""
-    if not isinstance(texto, str):
+    """Normaliza texto: limpia acentos, espacios, convierte a lowercase."""
+    if not texto or pd.isna(texto):
         return ""
-    
-    # Remover espacios extras
-    texto = re.sub(r'\s+', ' ', texto).strip()
-    
-    # Remover acentos (opcional, para búsquedas)
-    # texto = ''.join(c for c in unicodedata.normalize('NFD', texto)
-    #                if unicodedata.category(c) != 'Mn')
-    
-    return texto
+    texto = str(texto).strip()
+    # Quitar acentos
+    texto = ''.join(
+        c for c in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(c) != 'Mn'
+    )
+    return texto.lower()
 
 
 def limpiar_dataframe(df):
-    """Limpia dataframe: valores nulos, espacios, etc."""
-    df = df.copy()
-    
-    # Convertir a string
-    for col in df.columns:
-        df[col] = df[col].astype(str).str.strip()
-        df[col] = df[col].replace(['NA', 'na', 'null', 'None'], '')
-    
-    return df
+    """Limpia DataFrame: quita espacios en nombres de columnas y valores nulos."""
+    df.columns = df.columns.str.strip()
+    return df.fillna("")
 
 
-# ==================== FORMATOS ====================
-def fmt_entero(x, default="0"):
-    """Formatea número entero con miles."""
+def fmt_entero(x):
+    """Formatea entero con separadores de miles."""
     try:
-        if pd.isna(x) or x is None:
-            return default
-        
-        x = float(x)
-        return f"{int(x):,.0f}".replace(",", ".")
+        return f"{int(float(x)):,}".replace(',', '.')
     except:
-        return default
+        return str(x)
 
 
-def fmt_decimal(x, decimales=2, default="0"):
-    """Formatea número decimal con miles y coma decimal."""
+def fmt_decimal(x, decimales=2):
+    """Formatea decimal."""
     try:
-        if pd.isna(x) or x is None:
-            return default
-        
-        x = float(x)
-        formato = f"{{:,.{decimales}f}}"
-        resultado = formato.format(x)
-        
-        # Cambiar punto a coma en decimales
-        return resultado.replace(",", "|").replace(".", ",").replace("|", ".")
+        return f"{float(x):.{decimales}f}".replace('.', ',')
     except:
-        return default
+        return str(x)
 
 
-def fmt_coordenada(x, decimales=5):
-    """Formatea coordenada con coma decimal y al menos 5 decimales."""
-    if pd.isna(x) or x is None or x == "":
-        return None
-    
+def fmt_coordenada(lat, lon, formato='decimal'):
+    """Formatea coordenada según formato especificado."""
     try:
-        num = float(str(x).replace(",", "."))
-        resultado = f"{num:.{decimales}f}".replace(".", ",")
-        return resultado
+        lat = float(lat)
+        lon = float(lon)
+        if formato == 'decimal':
+            return f"{lat:.4f}, {lon:.4f}"
+        elif formato == 'gms':
+            return f"{decimal_a_gms(lat)}, {decimal_a_gms(lon)}"
+        return f"{lat}, {lon}"
     except:
-        return None
+        return f"{lat}, {lon}"
 
 
-# ==================== COORDENADAS ====================
-def gms_a_decimal(coord):
-    """Convierte GMS (Grados Minutos Segundos) a Decimal."""
-    if coord is None or coord == "" or pd.isna(coord):
-        return np.nan
+def detectar_encabezado(genero, orden):
+    """Detecta si una fila es encabezado por palabras clave."""
+    palabras_clave = ['genero', 'género', 'orden', 'familia', 'filo', 'clase', 'reino']
+    g = normalizar_texto(genero)
+    o = normalizar_texto(orden)
     
-    coord = str(coord).strip()
+    for palabra in palabras_clave:
+        if palabra in g or palabra in o:
+            return True
+    return False
+
+
+def formatar_hora(hora_str):
+    """Formatea hora a HH:MM:SS."""
+    if not hora_str or pd.isna(hora_str):
+        return ""
     
-    # Si no tiene símbolos de GMS, es decimal
-    if not re.search(r'°|\'|"', coord):
+    hora_str = str(hora_str).strip()
+    
+    # Intentar parsear diferentes formatos
+    formatos = [
+        "%H:%M:%S", "%H:%M", "%H%M%S", "%H%M",
+        "%H:%M:%S.%f", "%I:%M:%S %p"
+    ]
+    
+    for fmt in formatos:
         try:
-            return float(coord.replace(",", "."))
+            tiempo = datetime.strptime(hora_str, fmt)
+            return tiempo.strftime("%H:%M:%S")
         except:
-            return np.nan
+            continue
     
-    # Extraer números
-    nums = re.findall(r'[\d.,]+', coord)
-    try:
-        nums = [float(n.replace(",", ".")) for n in nums]
-    except:
-        return np.nan
-    
-    if len(nums) == 0:
-        return np.nan
-    
-    # GMS to Decimal: D + M/60 + S/3600
-    decimal = nums[0]
-    if len(nums) > 1:
-        decimal += nums[1] / 60
-    if len(nums) > 2:
-        decimal += nums[2] / 3600
-    
-    # Negativo si S, W, O
-    if re.search(r'S|W|O|-', coord, re.IGNORECASE):
-        decimal *= -1
-    
-    return decimal
+    return hora_str
 
 
-# ==================== HORA ====================
-def formatar_hora(valor):
-    """Formatea hora a formato HH:MM."""
-    if valor is None or valor == "" or pd.isna(valor):
+def gms_a_decimal(coord_str):
+    """Convierte coordenada sexagesimal (GMS) a decimal."""
+    if not coord_str or pd.isna(coord_str):
         return None
     
-    valor = str(valor).strip()
+    coord_str = str(coord_str).strip()
     
-    # Si ya está en formato HH:MM
-    if re.match(r'^\d{2}:\d{2}', valor):
-        return re.search(r'\d{2}:\d{2}', valor).group()
-    
-    # Intentar parsear número
+    # Si ya es decimal, devolverlo
     try:
-        num = float(valor.replace(",", "."))
-        
-        # Si es 0-23, horas
-        if 0 <= num <= 23 and num == int(num):
-            return f"{int(num):02d}:00"
-        
-        # Si es 0-2400, formato HHMM
-        if 0 < num < 2400 and num == int(num):
-            horas = int(num) // 100
-            minutos = int(num) % 100
-            if horas < 24 and minutos < 60:
-                return f"{horas:02d}:{minutos:02d}"
-        
-        # Si es 0-1, fracción del día
-        if 0 <= num <= 1:
-            segundos_totales = int(num * 86400)
-            horas = (segundos_totales // 3600) % 24
-            minutos = (segundos_totales % 3600) // 60
-            return f"{horas:02d}:{minutos:02d}"
-    
+        valor = float(coord_str.replace(',', '.'))
+        if -180 <= valor <= 180:
+            return valor
     except:
         pass
+    
+    # Patrones para sexagesimal
+    # 23°30'15"S, 23° 30' 15" S, 23:30:15, etc.
+    
+    # Reemplazar caracteres especiales
+    coord_str = re.sub(r'[°º]', ' ', coord_str)
+    coord_str = re.sub(r'[\'']', ' ', coord_str)
+    coord_str = re.sub(r'[""]', ' ', coord_str)
+    coord_str = re.sub(r'[NSEWnsew]', ' ', coord_str)
+    coord_str = re.sub(r'[:;/]', ' ', coord_str)
+    
+    # Extraer números
+    numeros = re.findall(r'[\d.]+', coord_str)
+    
+    if len(numeros) >= 1:
+        try:
+            grados = float(numeros[0])
+            minutos = float(numeros[1]) if len(numeros) > 1 else 0
+            segundos = float(numeros[2]) if len(numeros) > 2 else 0
+            
+            decimal = grados + minutos/60 + segundos/3600
+            
+            # Detectar si es Sur u Oeste
+            if 'S' in coord_str.upper() or 'O' in coord_str.upper() or 'W' in coord_str.upper():
+                decimal = -abs(decimal)
+            
+            if -180 <= decimal <= 180:
+                return decimal
+        except:
+            pass
     
     return None
 
 
-# ==================== DETECCIÓN ====================
-def detectar_encabezado(reino, filo, clase, orden, familia, genero):
-    """Detecta si una fila es encabezado."""
-    palabras_clave = [
-        "reino", "phylum", "class", "order", "family", "genus",
-        "clase", "orden", "familia", "género", "filo",
-        "epiteto", "specific", "name", "nombre"
-    ]
+def decimal_a_gms(decimal):
+    """Convierte coordenada decimal a sexagesimal (GMS)."""
+    if not decimal or pd.isna(decimal):
+        return ""
     
-    valores = [reino, filo, clase, orden, familia, genero]
-    valores_lower = [str(v).lower() for v in valores if v and v != ""]
+    decimal = float(decimal)
     
-    coincidencias = sum(1 for v in valores_lower if any(k in v for k in palabras_clave))
+    signo = 'S' if decimal < 0 else 'N'
+    if ',' in str(decimal):  # Es longitud
+        signo = 'O' if decimal < 0 else 'E'
     
-    return coincidencias >= 3
+    decimal = abs(decimal)
+    grados = int(decimal)
+    minutos_float = (decimal - grados) * 60
+    minutos = int(minutos_float)
+    segundos = (minutos_float - minutos) * 60
+    
+    return f"{grados}°{minutos}'{segundos:.2f}\"{signo}"
 
 
-def filtrar_especies_validas(df):
-    """Filtra especies válidas (elimina vacíos)."""
-    df = df.copy()
+def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
+    """Registra mensajes en archivo log."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_path = LOGS_DIR / archivo
     
-    # Normalizar
-    df['genero_clean'] = df['genero_corr'].str.lower().str.strip()
-    df['epiteto_clean'] = df['epiteto_corr'].str.lower().str.strip()
+    prefijo = f"[{timestamp}] [{tipo.upper()}] "
+    log_msg = prefijo + mensaje + "\n"
     
-    # Filtrar
-    validas = (
-        (df['genero_clean'] != "") &
-        (df['epiteto_clean'] != "") &
-        (~df['genero_clean'].isin(['genero', 'género', 'na'])) &
-        (~df['epiteto_clean'].isin(['epiteto especifico', 'epíteto específico', 'na']))
-    )
-    
-    df = df[validas].drop(['genero_clean', 'epiteto_clean'], axis=1)
-    
-    return df
+    try:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(log_msg)
+    except Exception as e:
+        print(f"Error al registrar log: {e}")
 
 
-# ==================== VALIDACIÓN ====================
-def validar_entrada_archivo(df):
-    """Valida que el Excel tenga formato Darwin Core."""
-    errores = []
-    
-    if df.shape[0] == 0:
-        errores.append("Archivo vacío")
-    
-    if df.shape[1] < 34:
-        errores.append(f"Solo {df.shape[1]} columnas (se requieren 34+)")
-    
-    return errores
+# ==================== VALIDACIONES ====================
+
+def validar_rango(valor, min_val, max_val):
+    """Valida si un valor está en rango."""
+    try:
+        v = float(valor)
+        return min_val <= v <= max_val
+    except:
+        return False
 
 
-# ==================== ESTADÍSTICAS BÁSICAS ====================
-def contar_valores_validos(serie):
-    """Cuenta valores válidos (no nulos, no vacíos)."""
-    return sum((serie != "") & (serie.notna()))
+def es_numero(valor):
+    """Verifica si un valor es numérico."""
+    try:
+        float(valor)
+        return True
+    except:
+        return False
 
 
-def obtener_unicas(serie):
-    """Obtiene valores únicos válidos."""
-    validas = serie[(serie != "") & (serie.notna())].unique()
-    return validas
-
-
-print("✅ Módulo utils.py cargado correctamente")
+def es_vacio(valor):
+    """Verifica si un valor está vacío."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return True
+    return str(valor).strip().lower() in ['', 'na', 'null', 'none', 'nan']
