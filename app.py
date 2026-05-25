@@ -13,20 +13,18 @@ from io import BytesIO
 import warnings
 
 warnings.filterwarnings('ignore')
-
 # ==================== IMPORTAR MÓDULOS ====================
 from modules.config import *
 from modules.utils import (
     safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
     fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
-    registrar_log
+    registrar_log, filtrar_especies_validas
 )
 from modules.taxonomia import gestor_taxonomia
 from modules.coordenadas import validador
 from modules.ecologia import calc_ecologico
 from modules.graficos import gen_graficos
 from modules.excel_io import gestor_excel
-
 # ==================== CONFIGURACIÓN STREAMLIT ====================
 st.set_page_config(
     page_title="DarwinCheck Vol.1",
