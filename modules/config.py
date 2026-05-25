@@ -1,93 +1,83 @@
 # ============================================================================ #
-#          DarwinCheck Vol.1 - Auditoría Taxonómica y Geográfica             #
-#                         MÓDULO: CONFIGURACIÓN                              #
+#                    DarwinCheck - Configuración Global                       #
 # ============================================================================ #
 
-import os
 from pathlib import Path
+from datetime import datetime
 
-# ==================== DIRECTORIOS ====================
-BASE_DIR = Path(__file__).parent
+# ==================== RUTAS ====================
+BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
+LOGS_DIR = BASE_DIR / "logs"
 CACHE_DIR = BASE_DIR / "cache"
 TEMP_DIR = BASE_DIR / "temp"
 
 # Crear directorios si no existen
-for directory in [DATA_DIR, CACHE_DIR, TEMP_DIR]:
-    directory.mkdir(exist_ok=True)
+for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
+    dir_path.mkdir(exist_ok=True)
 
 # ==================== ARCHIVOS ====================
-SIMBIO_FILE = DATA_DIR / "SIMBIO_Especies_2026-02-19.xlsx"
 LOGO_FILE = BASE_DIR / "logo.png"
+SIMBIO_FILE = DATA_DIR / "SIMBIO_Especies_2026-02-19.xlsx"
 
-# ==================== CONFIGURACIÓN ====================
-MAX_FILE_SIZE_MB = 50
-MAX_ROWS_PROCESS = 100000
-MAX_ROWS_DISPLAY = 5000
-MAX_SPECIES_CHARTS = 30
-TOP_SPECIES_DISPLAY = 20
+# ==================== DARWIN CORE - ÍNDICES DE COLUMNAS ====================
+DARWIN_CORE_COLS = {
+    'año': 4,
+    'mes': 5,
+    'dia': 6,
+    'hora_inicio': 7,
+    'reino': 14,
+    'filo': 15,
+    'clase': 16,
+    'orden': 17,
+    'familia': 18,
+    'genero': 19,
+    'epiteto_especifico': 21,
+    'nombre_comun': 23,
+    'valor': 29,
+    'latitud': 31,
+    'longitud': 32,
+    'hora_registro': 33,
+}
+
+# ==================== SIMBIO - COLUMNAS ====================
+SIMBIO_COLS = {
+    'genero': 'Género',
+    'epiteto': 'Epíteto específico',
+    'estado_conservacion': 'Estado de Conservación vigente',
+    'nombre_comun': 'Nombre común',
+    'reino': 'Reino',
+    'filo': 'Filo o División',
+    'clase': 'Clase',
+    'orden': 'Orden',
+    'familia': 'Familia',
+}
 
 # ==================== GBIF ====================
-GBIF_API_URL = "https://api.gbif.org/v1/species/match"
+GBIF_API_BASE = "https://api.gbif.org/v1"
 GBIF_TIMEOUT = 5
-GBIF_CACHE_EXPIRY = 86400  # 24 horas
+GBIF_CACHE_SIZE = 1000
 
-# ==================== COORDENADAS CHILE ====================
-CHILE_BOUNDS = {
-    "continental": {
-        "lat_min": -56.0,
-        "lat_max": -17.5,
-        "lon_min": -76.0,
-        "lon_max": -66.0
-    },
-    "rapa_nui": {
-        "lat": -27.1,
-        "lon": -109.4,
-        "tolerance": 0.5
-    },
-    "juan_fernandez": {
-        "lat": -33.6,
-        "lon": -78.8,
-        "tolerance": 0.5
-    }
+# ==================== COORDENADAS - CHILE ====================
+CHILE_CONTINENTAL = {
+    'lat_min': -56.0,
+    'lat_max': -17.5,
+    'lon_min': -76.0,
+    'lon_max': -66.0,
 }
 
-# ==================== COLUMNAS DARWIN CORE ====================
-DARWIN_CORE_COLUMNS = {
-    "reino": 15,
-    "filo": 16,
-    "clase": 17,
-    "orden": 18,
-    "familia": 19,
-    "genero": 20,
-    "epiteto": 22,
-    "nombre_comun": 24,
-    "valor": 30,
-    "anio": 5,
-    "mes": 6,
-    "dia": 7,
-    "hora_inicio": 8,
-    "lat": 32,
-    "lon": 33,
-    "hora_registro": 34
+RAPA_NUI = {
+    'lat': -27.1,
+    'lon': -109.4,
+    'tolerancia': 0.5,
 }
 
-# ==================== ESTILOS ====================
-COLOR_SUCCESS = "#27ae60"
-COLOR_WARNING = "#f39c12"
-COLOR_ERROR = "#e74c3c"
-COLOR_INFO = "#3498db"
-COLOR_SIDEBAR = "#2c3e50"
-COLOR_BG = "#ecf0f1"
+JUAN_FERNANDEZ = {
+    'lat': -33.6,
+    'lon': -78.8,
+    'tolerancia': 0.5,
+}
 
-# ==================== TEXTO ====================
-APP_TITLE = "DarwinCheck Vol.1 - Auditoría Taxonómica y Geográfica"
-APP_AUTHOR = "Loreto Campos © 2026 - BioCore"
-FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeY63B4iIxCthAPo1eHgOySie6ljdkX_yiLSeto8MaEf2EOdg/viewform?usp=dialog"
-
-# ==================== MENSAJES ====================
-MSG_LOADING_FILE = "📂 Leyendo archivo..."
-MSG_PROCESSING = "⏳ Procesando archivo..."
-MSG_COMPLETE = "✅ Procesamiento completado"
-MSG_NO_DATA = "❌ Archivo vacío o no válido"
-MSG_NO_AMBIGUITIES = "✅ No se detectaron ambigüedades. Todos los registros fueron corregidos correctamente."
+# ==================== VERSIÓN ====================
+VERSION = "1.0.0"
+FECHA = datetime.now().strftime("%Y-%m-%d")
