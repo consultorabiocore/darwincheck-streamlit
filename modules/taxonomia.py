@@ -22,55 +22,64 @@ class GestorTaxonomia:
         """Carga base de datos SIMBIO desde Excel."""
         try:
             if SIMBIO_FILE.exists():
-                simbio_raw = pd.read_excel(
-                    SIMBIO_FILE,
-                    sheet_name='Especies',
-                    dtype=str
-                )
-                
-                # Limpiar nombres de columnas
-                simbio_raw.columns = simbio_raw.columns.str.strip()
-                
-                # Crear dataframe procesado
-                self.simbio_df = pd.DataFrame({
-                    'nombre_cientifico': (
-                        simbio_raw.get('Género', '') + ' ' + 
-                        simbio_raw.get('Epíteto específico', '')
-                    ),
-                    'estado_conservacion': simbio_raw.get('Estado de Conservación vigente', ''),
-                    'nombre_comun': simbio_raw.get('Nombre común', ''),
-                    'reino': simbio_raw.get('Reino', ''),
-                    'filo': simbio_raw.get('Filo o División', ''),
-                    'clase': simbio_raw.get('Clase', ''),
-                    'orden': simbio_raw.get('Orden', ''),
-                    'familia': simbio_raw.get('Familia', ''),
-                    'genero': simbio_raw.get('Género', ''),
-                })
-                
-                # Normalizar para búsqueda
-                self.simbio_df['nombre_busqueda'] = (
-                    self.simbio_df['nombre_cientifico'].apply(
-                        lambda x: normalizar_texto(x)
+                try:
+                    simbio_raw = pd.read_excel(
+                        SIMBIO_FILE,
+                        sheet_name='Especies',
+                        dtype=str
                     )
-                )
+                    
+                    # Limpiar nombres de columnas
+                    simbio_raw.columns = simbio_raw.columns.str.strip()
+                    
+                    # Crear dataframe procesado
+                    self.simbio_df = pd.DataFrame({
+                        'nombre_cientifico': (
+                            simbio_raw.get('Género', '') + ' ' + 
+                            simbio_raw.get('Epíteto específico', '')
+                        ),
+                        'estado_conservacion': simbio_raw.get('Estado de Conservación vigente', ''),
+                        'nombre_comun': simbio_raw.get('Nombre común', ''),
+                        'reino': simbio_raw.get('Reino', ''),
+                        'filo': simbio_raw.get('Filo o División', ''),
+                        'clase': simbio_raw.get('Clase', ''),
+                        'orden': simbio_raw.get('Orden', ''),
+                        'familia': simbio_raw.get('Familia', ''),
+                        'genero': simbio_raw.get('Género', ''),
+                    })
+                    
+                    # Normalizar para búsqueda
+                    self.simbio_df['nombre_busqueda'] = (
+                        self.simbio_df['nombre_cientifico'].apply(
+                            lambda x: normalizar_texto(x)
+                        )
+                    )
+                    
+                    # Limpiar valores
+                    for col in self.simbio_df.columns:
+                        self.simbio_df[col] = self.simbio_df[col].apply(safe_val)
+                    
+                    # Filtrar filas sin género
+                    self.simbio_df = self.simbio_df[
+                        self.simbio_df['genero'].apply(lambda x: not es_vacio(x))
+                    ]
+                    
+                    print(f"✅ SIMBIO cargado: {len(self.simbio_df)} especies")
                 
-                # Limpiar valores
-                for col in self.simbio_df.columns:
-                    self.simbio_df[col] = self.simbio_df[col].apply(safe_val)
-                
-                # Filtrar filas sin género
-                self.simbio_df = self.simbio_df[
-                    self.simbio_df['genero'].apply(lambda x: not es_vacio(x))
-                ]
-                
-                print(f"✅ SIMBIO cargado: {len(self.simbio_df)} especies")
+                except Exception as e:
+                    print(f"⚠️ Error leyendo SIMBIO Excel: {e}")
+                    self.simbio_df = pd.DataFrame()
+            else:
+                print(f"⚠️ Archivo SIMBIO no encontrado: {SIMBIO_FILE}")
+                self.simbio_df = pd.DataFrame()
         
         except Exception as e:
-            print(f"⚠️ Error cargando SIMBIO: {e}")
+            print(f"⚠️ Error inicializando SIMBIO: {e}")
+            self.simbio_df = pd.DataFrame()
     
     def buscar_simbio(self, genero, epiteto):
         """Busca especie en SIMBIO por género + epíteto."""
-        if es_vacio(genero) or es_vacio(epiteto):
+        if es_vacio(genero) or es_vacio(epiteto) or len(self.simbio_df) == 0:
             return None
         
         nombre = normalizar_texto(f"{genero} {epiteto}")
@@ -133,8 +142,8 @@ class GestorTaxonomia:
         
         return None
     
-    def obtener_taxonomia(self, genero, epiteto):
-        """Obtiene taxonomía: primero SIMBIO, luego GBIF."""
+    def resolver_taxonomia(self, genero, epiteto):
+        """Resuelve taxonomía: primero SIMBIO, luego GBIF."""
         # Intentar SIMBIO
         resultado = self.buscar_simbio(genero, epiteto)
         if resultado:
@@ -158,6 +167,10 @@ class GestorTaxonomia:
             'estado_conservacion': '',
             'fuente': 'NO_ENCONTRADO'
         }
+    
+    def obtener_taxonomia(self, genero, epiteto):
+        """Alias para resolver_taxonomia (compatibilidad)."""
+        return self.resolver_taxonomia(genero, epiteto)
 
 
 # Instancia global
