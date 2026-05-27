@@ -78,6 +78,39 @@ JUAN_FERNANDEZ = {
     'tolerancia': 0.5,
 }
 
+# ==================== MENSAJES ====================
+MSG_INICIO = """
+### 📖 ¿Cómo usar DarwinCheck Vol.1?
+
+**DarwinCheck** es una herramienta de auditoría taxonómica y geográfica para datos Darwin Core.
+
+#### 🎯 Pasos principales:
+
+1. **Cargar archivo Excel** con estructura Darwin Core (mínimo 34 columnas)
+2. **Seleccionar color** para los gráficos (opcional)
+3. El sistema automáticamente:
+   - ✅ Normaliza datos taxonómicos
+   - ✅ Valida coordenadas dentro de Chile
+   - ✅ Calcula índices ecológicos
+   - ✅ Genera reportes de auditoría
+
+#### 📊 Visualizaciones disponibles:
+- **Abundancia**: Especies más representadas
+- **Dominancia**: Distribución con Treemap
+- **Riqueza**: Número de especies (Lollipop)
+- **Curva de acumulación**: Rarefacción de especies
+- **Conservación**: Estados de protección
+- **Datos**: Tabla completa con correcciones
+
+#### 🛠️ Archivos soportados:
+- Formato: `.xlsx` o `.xls`
+- Mínimo: 34 columnas Darwin Core
+- Hoja requerida: "Ocurrencia"
+
+#### 📝 Contacto:
+BioCore © 2026 - Loreto Campos
+"""
+
 # ==================== VERSIÓN ====================
 VERSION = "1.0.0"
 FECHA = datetime.now().strftime("%Y-%m-%d")
