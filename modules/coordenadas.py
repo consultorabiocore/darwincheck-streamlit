@@ -112,6 +112,29 @@ class ValidadorCoordenadas:
         )
     
     @staticmethod
+    def validar_coordinate_chile(lat, lon):
+        """Valida coordenadas y retorna estado geográfico con diccionario."""
+        estado = ValidadorCoordenadas.obtener_estado_geografico(lat, lon)
+        
+        # Determinar ubicación
+        if estado == "CHILE_CONTINENTAL":
+            ubicacion = "Chile Continental"
+        elif estado == "RAPA_NUI":
+            ubicacion = "Rapa Nui"
+        elif estado == "JUAN_FERNANDEZ":
+            ubicacion = "Juan Fernández"
+        elif estado == "FUERA_CHILE":
+            ubicacion = "Fuera de Chile"
+        else:
+            ubicacion = "Inválido"
+        
+        return {
+            'estado': estado,
+            'ubicacion': ubicacion,
+            'valido': estado != "FUERA_RANGO_GLOBAL" and estado != "FUERA_CHILE"
+        }
+    
+    @staticmethod
     def obtener_estado_geografico(lat, lon):
         """Obtiene estado geográfico del punto."""
         if not ValidadorCoordenadas.validar_rango_global(lat, lon):
