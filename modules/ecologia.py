@@ -73,8 +73,45 @@ class CalculadoraEcologica:
         return chao
     
     @staticmethod
+    def rarefaccion(abundancia_especies, permutaciones=50):
+        """Calcula curva de rarefacción con permutaciones."""
+        N = np.sum(abundancia_especies)
+        abundancia_no_cero = abundancia_especies[abundancia_especies > 0]
+        
+        # Usar tamaños de 1 a N
+        tamanos = np.arange(1, int(N) + 1)
+        
+        rarefaccion_media = []
+        rarefaccion_sd = []
+        
+        for n in tamanos:
+            if n > N:
+                continue
+            
+            valores = []
+            for _ in range(permutaciones):
+                riqueza_esperada = 0
+                for abundancia in abundancia_no_cero:
+                    if abundancia >= n:
+                        try:
+                            prob = 1 - (comb(int(N - abundancia), int(n)) / comb(int(N), int(n)))
+                            riqueza_esperada += prob
+                        except:
+                            riqueza_esperada += 1
+                valores.append(riqueza_esperada)
+            
+            rarefaccion_media.append(np.mean(valores))
+            rarefaccion_sd.append(np.std(valores))
+        
+        return {
+            'muestras': tamanos[:len(rarefaccion_media)],
+            'riqueza': np.array(rarefaccion_media),
+            'sd': np.array(rarefaccion_sd)
+        }
+    
+    @staticmethod
     def calcular_rarefaccion(abundancia_especies, tamano_muestra=None):
-        """Calcula curva de rarefacción."""
+        """Calcula curva de rarefacción (compatibilidad)."""
         N = np.sum(abundancia_especies)
         abundancia_no_cero = abundancia_especies[abundancia_especies > 0]
         
@@ -93,7 +130,6 @@ class CalculadoraEcologica:
             riqueza_esperada = 0
             for abundancia in abundancia_no_cero:
                 if abundancia >= n:
-                    # Probabilidad de que la especie esté en la muestra
                     try:
                         prob = 1 - (comb(N - abundancia, n) / comb(N, n))
                         riqueza_esperada += prob
@@ -115,6 +151,51 @@ class CalculadoraEcologica:
             'pielou': CalculadoraEcologica.pielou(abundancia_especies),
             'margalef': CalculadoraEcologica.margalef(abundancia_especies),
             'chao1': CalculadoraEcologica.chao1(abundancia_especies),
+        }
+    
+    @staticmethod
+    def crear_matriz_abundancia(df_biodiv):
+        """Crea matriz de abundancia desde dataframe de especies."""
+        if 'especie' in df_biodiv.columns and 'valor' in df_biodiv.columns:
+            # Agrupar por especie y sumar valores
+            abundancias = df_biodiv.groupby('especie')['valor'].sum()
+            return abundancias.values
+        return np.array([])
+    
+    @staticmethod
+    def resumen_completo(df_biodiv):
+        """Calcula resumen completo de índices ecológicos."""
+        # Crear matriz de abundancia
+        abundancias = CalculadoraEcologica.crear_matriz_abundancia(df_biodiv)
+        
+        if len(abundancias) == 0:
+            return {
+                'total_individuos': 0,
+                'riqueza': 0,
+                'shannon': 0,
+                'simpson': 0,
+                'pielou': 0,
+                'margalef': 0,
+                'chao1': 0,
+                'representatividad': 0
+            }
+        
+        indices = CalculadoraEcologica.calcular_todos_indices(abundancias)
+        
+        # Calcular representatividad (%)
+        S_observado = indices['riqueza']
+        S_estimado = indices['chao1']
+        representatividad = (S_observado / S_estimado * 100) if S_estimado > 0 else 0
+        
+        return {
+            'total_individuos': indices['abundancia_total'],
+            'riqueza': indices['riqueza'],
+            'shannon': indices['shannon'],
+            'simpson': indices['simpson'],
+            'pielou': indices['pielou'],
+            'margalef': indices['margalef'],
+            'chao1': indices['chao1'],
+            'representatividad': representatividad
         }
 
 
