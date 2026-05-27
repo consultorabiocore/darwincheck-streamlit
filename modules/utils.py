@@ -57,18 +57,17 @@ def fmt_decimal(x, decimales=2):
         return str(x)
 
 
-def fmt_coordenada(lat, lon, formato='decimal'):
-    """Formatea coordenada según formato especificado."""
+def fmt_coordenada(valor, formato='decimal'):
+    """Formatea una coordenada individual (lat o lon) según formato especificado."""
     try:
-        lat = float(lat)
-        lon = float(lon)
+        valor = float(valor)
         if formato == 'decimal':
-            return f"{lat:.4f}, {lon:.4f}"
+            return f"{valor:.4f}"
         elif formato == 'gms':
-            return f"{decimal_a_gms(lat)}, {decimal_a_gms(lon)}"
-        return f"{lat}, {lon}"
+            return decimal_a_gms(valor)
+        return str(valor)
     except:
-        return f"{lat}, {lon}"
+        return str(valor)
 
 
 def detectar_encabezado(genero, orden):
