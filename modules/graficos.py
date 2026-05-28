@@ -1,122 +1,178 @@
 # ============================================================================ #
-#              DarwinCheck - Generador de Gráficos                             #
+#              DarwinCheck - Generador de Gráficos con Plotly                   #
 # ============================================================================ #
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from io import BytesIO
+import plotly.graph_objects as go
+import plotly.express as px
 
 class GeneradorGraficos:
-    """Genera gráficos para visualizaciones."""
+    """Genera gráficos interactivos con Plotly para visualizaciones."""
     
     def __init__(self, color_defecto="#27ae60"):
         self.color = color_defecto
-        sns.set_style("whitegrid")
     
     def actualizar_color(self, color):
         """Actualiza color de gráficos."""
         self.color = color
     
-    def grafico_barras_abundancia(self, df_abundancia, titulo="Abundancia por Especie"):
-        """Crea gráfico de barras de abundancia."""
-        fig, ax = plt.subplots(figsize=(12, 6))
-        
-        df_ordenado = df_abundancia.sort_values(ascending=False).head(20)
-        
-        ax.barh(range(len(df_ordenado)), df_ordenado.values, color=self.color, alpha=0.8)
-        ax.set_yticks(range(len(df_ordenado)))
-        ax.set_yticklabels(df_ordenado.index, fontsize=10)
-        ax.set_xlabel("Número de Individuos", fontsize=11)
-        ax.set_title(titulo, fontsize=13, fontweight='bold')
-        
-        # Agregar valores
-        for i, v in enumerate(df_ordenado.values):
-            ax.text(v, i, f' {int(v)}', va='center', fontsize=9)
-        
-        plt.tight_layout()
-        return fig
+    def abundancia_top_especies(self, df, col_especie='especie', col_valor='valor', top=20):
+        """Crea gráfico de barras horizontal de top especies abundantes."""
+        try:
+            df_top = df.nlargest(top, col_valor)
+            
+            fig = go.Figure(data=[
+                go.Bar(
+                    y=df_top[col_especie],
+                    x=df_top[col_valor],
+                    orientation='h',
+                    marker=dict(color=self.color, opacity=0.8),
+                    text=df_top[col_valor],
+                    textposition='auto'
+                )
+            ])
+            
+            fig.update_layout(
+                title="Top 20 Especies Más Abundantes",
+                xaxis_title="Número de Individuos",
+                yaxis_title="Especie",
+                height=600,
+                showlegend=False,
+                hovermode='closest'
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Error en abundancia_top_especies: {e}")
+            return go.Figure()
     
-    def grafico_pastel_composicion(self, df_composicion, titulo="Composición de Especies"):
-        """Crea gráfico de pastel."""
-        fig, ax = plt.subplots(figsize=(10, 8))
-        
-        # Top 10, resto agrupado
-        df_top = df_composicion.head(10)
-        if len(df_composicion) > 10:
-            resto = pd.Series({
-                'Otros': df_composicion[10:].sum()
-            })
-            df_top = pd.concat([df_top, resto])
-        
-        colores = plt.cm.Set3(np.linspace(0, 1, len(df_top)))
-        
-        wedges, texts, autotexts = ax.pie(
-            df_top.values,
-            labels=df_top.index,
-            autopct='%1.1f%%',
-            colors=colores,
-            startangle=90
-        )
-        
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(9)
-        
-        ax.set_title(titulo, fontsize=13, fontweight='bold', pad=20)
-        plt.tight_layout()
-        return fig
+    def dominancia_treemap(self, df, col_especie='especie', col_valor='valor'):
+        """Crea treemap de distribución de abundancia."""
+        try:
+            fig = px.treemap(
+                df,
+                labels=col_especie,
+                values=col_valor,
+                title="Treemap: Distribución de Abundancia",
+                color=col_valor,
+                color_continuous_scale='Viridis'
+            )
+            
+            fig.update_layout(height=600)
+            return fig
+        except Exception as e:
+            print(f"Error en dominancia_treemap: {e}")
+            return go.Figure()
     
-    def grafico_dominancia(self, df_abundancia, titulo="Curva de Dominancia"):
-        """Crea gráfico de dominancia acumulada."""
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        df_ordenado = df_abundancia.sort_values(ascending=False)
-        abundancia_acumulada = np.cumsum(df_ordenado.values) / df_ordenado.sum() * 100
-        
-        ax.plot(
-            range(1, len(abundancia_acumulada) + 1),
-            abundancia_acumulada,
-            'o-',
-            color=self.color,
-            linewidth=2,
-            markersize=4
-        )
-        
-        ax.set_xlabel("Número de Especies (ordenadas por abundancia)", fontsize=11)
-        ax.set_ylabel("Abundancia Acumulada (%)", fontsize=11)
-        ax.set_title(titulo, fontsize=13, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-        ax.set_ylim([0, 105])
-        
-        plt.tight_layout()
-        return fig
+    def riqueza_lollipop(self, df, col_especie='especie', top=20):
+        """Crea gráfico lollipop de riqueza de especies."""
+        try:
+            # Contar ocurrencias de cada especie
+            riqueza = df[col_especie].value_counts().head(top).reset_index()
+            riqueza.columns = [col_especie, 'count']
+            
+            fig = go.Figure(data=[
+                go.Scatter(
+                    x=riqueza[col_especie],
+                    y=riqueza['count'],
+                    mode='markers+lines',
+                    marker=dict(size=10, color=self.color),
+                    line=dict(color=self.color, width=2)
+                )
+            ])
+            
+            fig.update_layout(
+                title="Riqueza de Especies (Lollipop)",
+                xaxis_title="Especie",
+                yaxis_title="Frecuencia",
+                height=500,
+                showlegend=False,
+                hovermode='closest'
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Error en riqueza_lollipop: {e}")
+            return go.Figure()
     
-    def grafico_diversidad_shannon(self, valores_shannon):
-        """Crea gráfico de índice Shannon."""
-        fig, ax = plt.subplots(figsize=(8, 6))
-        
-        if isinstance(valores_shannon, (list, np.ndarray)):
-            ax.bar(range(len(valores_shannon)), valores_shannon, color=self.color, alpha=0.8)
-            ax.set_xlabel("Muestreo", fontsize=11)
-        else:
-            ax.bar(['Shannon'], [valores_shannon], color=self.color, alpha=0.8)
-        
-        ax.set_ylabel("Índice de Shannon (H)", fontsize=11)
-        ax.set_title("Diversidad - Índice de Shannon", fontsize=13, fontweight='bold')
-        ax.set_ylim(0, max(8, (valores_shannon if isinstance(valores_shannon, (int, float)) else max(valores_shannon)) + 1))
-        
-        plt.tight_layout()
-        return fig
+    def curva_acumulacion(self, abundancias, muestras, riqueza, sd, chao1):
+        """Crea gráfico de curva de acumulación de especies."""
+        try:
+            # Convertir a array si es necesario
+            muestras = np.array(muestras)
+            riqueza = np.array(riqueza)
+            sd = np.array(sd)
+            
+            fig = go.Figure()
+            
+            # Línea de rarefacción
+            fig.add_trace(go.Scatter(
+                x=muestras,
+                y=riqueza,
+                mode='lines+markers',
+                name='Rarefacción',
+                line=dict(color=self.color, width=2),
+                marker=dict(size=5)
+            ))
+            
+            # Banda de confianza (±SD)
+            upper_bound = riqueza + sd
+            lower_bound = riqueza - sd
+            
+            fig.add_trace(go.Scatter(
+                x=np.concatenate([muestras, muestras[::-1]]),
+                y=np.concatenate([upper_bound, lower_bound[::-1]]),
+                fill='toself',
+                fillcolor='rgba(39, 174, 96, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                showlegend=True,
+                name='±SD'
+            ))
+            
+            # Línea Chao1
+            fig.add_hline(y=chao1, line_dash="dash", line_color="red", 
+                         annotation_text=f"Chao1: {chao1:.0f}")
+            
+            fig.update_layout(
+                title="Curva de Acumulación de Especies",
+                xaxis_title="Número de Muestras",
+                yaxis_title="Riqueza Esperada",
+                height=500,
+                hovermode='closest'
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Error en curva_acumulacion: {e}")
+            return go.Figure()
     
-    def fig_a_bytes(self, fig):
-        """Convierte figura matplotlib a bytes PNG."""
-        buf = BytesIO()
-        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-        buf.seek(0)
-        return buf.getvalue()
+    def conservacion_barras(self, df, col_categoria='estado_conservacion', col_count='count'):
+        """Crea gráfico de barras de estados de conservación."""
+        try:
+            fig = go.Figure(data=[
+                go.Bar(
+                    x=df[col_categoria],
+                    y=df[col_count],
+                    marker=dict(color=self.color, opacity=0.8),
+                    text=df[col_count],
+                    textposition='auto'
+                )
+            ])
+            
+            fig.update_layout(
+                title="Estados de Conservación",
+                xaxis_title="Estado",
+                yaxis_title="Número de Especies",
+                height=500,
+                showlegend=False,
+                hovermode='closest'
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Error en conservacion_barras: {e}")
+            return go.Figure()
 
 
 # Instancia global
