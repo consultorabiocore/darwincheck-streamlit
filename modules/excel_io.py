@@ -34,6 +34,23 @@ class GestorExcel:
             return None
     
     @staticmethod
+    def leer_darwin_core(archivo_subido):
+        """Lee archivo Darwin Core (alias de leer_archivo con manejo de errores)."""
+        try:
+            df = GestorExcel.leer_archivo(archivo_subido)
+            if df is None:
+                return None, "Error al leer el archivo Excel"
+            
+            # Validar que tenga mínimo 34 columnas
+            if len(df.columns) < 34:
+                return None, f"El archivo debe tener al menos 34 columnas. Tiene {len(df.columns)}"
+            
+            return df, None
+        
+        except Exception as e:
+            return None, str(e)
+    
+    @staticmethod
     def guardar_archivo(df, nombre_archivo, datos_auditoria=None):
         """Guarda DataFrame a archivo Excel con formato."""
         try:
