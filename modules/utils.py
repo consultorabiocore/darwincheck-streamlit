@@ -8,7 +8,6 @@ import re
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from modules.config import LOGS_DIR
 
 # ==================== UTILIDADES DE DATOS ====================
 
@@ -175,6 +174,8 @@ def decimal_a_gms(decimal):
 
 def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
     """Registra mensajes en archivo log."""
+    from .config import LOGS_DIR
+    
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_path = LOGS_DIR / archivo
     
