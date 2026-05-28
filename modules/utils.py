@@ -57,7 +57,7 @@ def fmt_decimal(x, decimales=2):
 
 
 def fmt_coordenada(valor, formato='decimal'):
-    """Formatea una coordenada individual (lat o lon) según formato especificado."""
+    """Formatea una coordenada individual (lat o lon) segun formato especificado."""
     try:
         valor = float(valor)
         if formato == 'decimal':
@@ -69,9 +69,9 @@ def fmt_coordenada(valor, formato='decimal'):
         return str(valor)
 
 
-def detectar_encabezado(genero, orden):
+def detectar_encabezado(genero, orden, filo='', clase='', familia='', reino=''):
     """Detecta si una fila es encabezado por palabras clave."""
-    palabras_clave = ['genero', 'género', 'orden', 'familia', 'filo', 'clase', 'reino']
+    palabras_clave = ['genero', 'genero', 'orden', 'familia', 'filo', 'clase', 'reino']
     g = normalizar_texto(genero)
     o = normalizar_texto(orden)
     
@@ -129,7 +129,7 @@ def gms_a_decimal(coord_str):
     coord_str = re.sub(r'[NSEWnsew]', ' ', coord_str)
     coord_str = re.sub(r'[:;/]', ' ', coord_str)
     
-    # Extraer números
+    # Extraer numeros
     numeros = re.findall(r'[\d.]+', coord_str)
     
     if len(numeros) >= 1:
@@ -157,7 +157,10 @@ def decimal_a_gms(decimal):
     if not decimal or pd.isna(decimal):
         return ""
     
-    decimal = float(decimal)
+    try:
+        decimal = float(decimal)
+    except:
+        return ""
     
     signo = 'S' if decimal < 0 else 'N'
     if ',' in str(decimal):  # Es longitud
@@ -174,25 +177,28 @@ def decimal_a_gms(decimal):
 
 def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
     """Registra mensajes en archivo log."""
-    from .config import LOGS_DIR
-    
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_path = LOGS_DIR / archivo
-    
-    prefijo = f"[{timestamp}] [{tipo.upper()}] "
-    log_msg = prefijo + mensaje + "\n"
-    
     try:
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(log_msg)
-    except Exception as e:
-        print(f"Error al registrar log: {e}")
+        from modules.config import LOGS_DIR
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_path = LOGS_DIR / archivo
+        
+        prefijo = f"[{timestamp}] [{tipo.upper()}] "
+        log_msg = prefijo + mensaje + "\n"
+        
+        try:
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(log_msg)
+        except Exception as e:
+            print(f"Error al registrar log: {e}")
+    except:
+        pass
 
 
 # ==================== VALIDACIONES ====================
 
 def validar_rango(valor, min_val, max_val):
-    """Valida si un valor está en rango."""
+    """Valida si un valor esta en rango."""
     try:
         v = float(valor)
         return min_val <= v <= max_val
@@ -201,7 +207,7 @@ def validar_rango(valor, min_val, max_val):
 
 
 def es_numero(valor):
-    """Verifica si un valor es numérico."""
+    """Verifica si un valor es numerico."""
     try:
         float(valor)
         return True
@@ -210,7 +216,7 @@ def es_numero(valor):
 
 
 def es_vacio(valor):
-    """Verifica si un valor está vacío."""
+    """Verifica si un valor esta vacio."""
     if valor is None or (isinstance(valor, float) and pd.isna(valor)):
         return True
     return str(valor).strip().lower() in ['', 'na', 'null', 'none', 'nan']
