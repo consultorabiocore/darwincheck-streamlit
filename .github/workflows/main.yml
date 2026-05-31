@@ -13,8 +13,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Instalar dependencias
-        run: pip install -r requirements.txt
+      - name: Ejecutar la aplicación o Tests
+        run: streamlit run app.py
 
       - name: Ejecutar la aplicación o Tests
         run: python main.py
