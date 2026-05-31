@@ -11,14 +11,15 @@ from datetime import datetime
 import json
 from io import BytesIO
 import warnings
+import sys
 
 warnings.filterwarnings('ignore')
-# ==================== IMPORTAR MÓDULOS ====================
-from modules.config import *
-import sys
-from pathlib import Path
+
+# Agregar ruta
 sys.path.insert(0, str(Path(__file__).parent))
 
+# AHORA sí importar los módulos
+from modules.config import *
 from modules.utils import (
     safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
     fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
