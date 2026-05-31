@@ -18,8 +18,17 @@ warnings.filterwarnings('ignore')
 # ==================== CONFIGURAR RUTA ====================
 sys.path.insert(0, str(Path(__file__).parent))
 
-# ==================== IMPORTAR MÓDULOS ====================
-from modules.config import init_directories, LOGO_FILE, MSG_INICIO
+# ==================== INICIALIZAR DIRECTORIOS PRIMERO ====================
+BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
+LOGS_DIR = BASE_DIR / "logs"
+CACHE_DIR = BASE_DIR / "cache"
+TEMP_DIR = BASE_DIR / "temp"
+
+for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
+    dir_path.mkdir(exist_ok=True)
+
+# ==================== AHORA SÍ IMPORTAR MÓDULOS ====================
 from modules.utils import (
     safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
     fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
@@ -31,8 +40,39 @@ from modules.ecologia import calc_ecologico
 from modules.graficos import gen_graficos
 from modules.excel_io import gestor_excel
 
-# Inicializar directorios
-init_directories()
+# Constantes de configuración
+LOGO_FILE = BASE_DIR / "logo.png"
+MSG_INICIO = """
+### 📖 ¿Cómo usar DarwinCheck Vol.1?
+
+**DarwinCheck** es una herramienta de auditoría taxonómica y geográfica para datos Darwin Core.
+
+#### 🎯 Pasos principales:
+
+1. **Cargar archivo Excel** con estructura Darwin Core (mínimo 34 columnas)
+2. **Seleccionar color** para los gráficos (opcional)
+3. El sistema automáticamente:
+    - ✅ Normaliza datos taxonómicos
+    - ✅ Valida coordenadas dentro de Chile
+    - ✅ Calcula índices ecológicos
+    - ✅ Genera reportes de auditoría
+
+#### 📊 Visualizaciones disponibles:
+- **Abundancia**: Especies más representadas
+- **Dominancia**: Distribución con Treemap
+- **Riqueza**: Número de especies (Lollipop)
+- **Curva de acumulación**: Rarefacción de especies
+- **Conservación**: Estados de protección
+- **Datos**: Tabla completa con correcciones
+
+#### 🛠️ Archivos soportados:
+- Formato: `.xlsx` o `.xls`
+- Mínimo: 34 columnas Darwin Core
+- Hoja requerida: "Ocurrencia"
+
+#### 📝 Contacto:
+BioCore © 2026 - Loreto Campos
+"""
 
 # ==================== CONFIGURACIÓN STREAMLIT ====================
 st.set_page_config(
