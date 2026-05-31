@@ -18,7 +18,7 @@ for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
 
 # ==================== ARCHIVOS ====================
 LOGO_FILE = BASE_DIR / "logo.png"
-SIMBIO_FILE = DATA_DIR / "SIMBIO_Especies_2026-02-19.xlsx"
+SIMBIO_FILE = BASE_DIR / "SIMBIO_Especies_2026-02-19.xlsx"
 
 # ==================== DARWIN CORE - ÍNDICES DE COLUMNAS ====================
 DARWIN_CORE_COLS = {
