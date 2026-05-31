@@ -20,7 +20,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from modules.utils import (
-    safe_val, normalizar_texto, limpiar_dataframe, ...
+    safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
+    fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
+    registrar_log
 )
 from modules.taxonomia import gestor_taxonomia
 from modules.coordenadas import validador
