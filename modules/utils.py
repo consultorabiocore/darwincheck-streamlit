@@ -176,12 +176,18 @@ def decimal_a_gms(decimal):
 
 
 def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
+
+def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
     """Registra mensajes en archivo log."""
     try:
-        from modules.config import LOGS_DIR
+        # NO importar modules.config, usar Path directamente
+        from pathlib import Path
+        
+        log_dir = Path(__file__).parent.parent / "logs"
+        log_dir.mkdir(exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_path = LOGS_DIR / archivo
+        log_path = log_dir / archivo
         
         prefijo = f"[{timestamp}] [{tipo.upper()}] "
         log_msg = prefijo + mensaje + "\n"
@@ -193,7 +199,6 @@ def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
             print(f"Error al registrar log: {e}")
     except:
         pass
-
 
 # ==================== VALIDACIONES ====================
 
