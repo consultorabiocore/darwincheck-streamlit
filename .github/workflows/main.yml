@@ -13,8 +13,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Ejecutar la aplicación o Tests
-        run: streamlit run app.py
+      - name: Instalar dependencias
+        run: pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: Ejecutar la aplicación o Tests
-        run: python main.py
+      - name: Ejecutar Streamlit
+        run: python -m streamlit run app.py --logger.level=error
