@@ -12,9 +12,11 @@ LOGS_DIR = BASE_DIR / "logs"
 CACHE_DIR = BASE_DIR / "cache"
 TEMP_DIR = BASE_DIR / "temp"
 
-# Crear directorios si no existen
-for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
-    dir_path.mkdir(exist_ok=True)
+# ==================== FUNCIÓN PARA INICIALIZAR DIRECTORIOS ====================
+def init_directories():
+    """Crea directorios necesarios si no existen."""
+    for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
+        dir_path.mkdir(exist_ok=True)
 
 # ==================== ARCHIVOS ====================
 LOGO_FILE = BASE_DIR / "logo.png"
@@ -89,10 +91,10 @@ MSG_INICIO = """
 1. **Cargar archivo Excel** con estructura Darwin Core (mínimo 34 columnas)
 2. **Seleccionar color** para los gráficos (opcional)
 3. El sistema automáticamente:
-   - ✅ Normaliza datos taxonómicos
-   - ✅ Valida coordenadas dentro de Chile
-   - ✅ Calcula índices ecológicos
-   - ✅ Genera reportes de auditoría
+    - ✅ Normaliza datos taxonómicos
+    - ✅ Valida coordenadas dentro de Chile
+    - ✅ Calcula índices ecológicos
+    - ✅ Genera reportes de auditoría
 
 #### 📊 Visualizaciones disponibles:
 - **Abundancia**: Especies más representadas
