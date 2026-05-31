@@ -15,11 +15,13 @@ import sys
 
 warnings.filterwarnings('ignore')
 
-# Agregar ruta
+# ==================== CONFIGURAR RUTA ====================
 sys.path.insert(0, str(Path(__file__).parent))
 
-# AHORA sí importar los módulos
-from modules.config import *
+# ==================== IMPORTAR MÓDULOS ====================
+# NO hacer: from modules.config import *
+# En su lugar, importar directamente lo que necesitas
+
 from modules.utils import (
     safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
     fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
@@ -30,6 +32,11 @@ from modules.coordenadas import validador
 from modules.ecologia import calc_ecologico
 from modules.graficos import gen_graficos
 from modules.excel_io import gestor_excel
+
+# Ahora importar config DESPUÉS de otros módulos
+from modules.config import LOGO_FILE, MSG_INICIO
+
+# ==================== RESTO DEL CÓDIGO ====================
 # ==================== CONFIGURACIÓN STREAMLIT ====================
 st.set_page_config(
     page_title="DarwinCheck Vol.1",
