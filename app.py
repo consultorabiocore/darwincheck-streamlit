@@ -2,6 +2,20 @@
 #          DarwinCheck Vol.1 - Auditoría Taxonómica y Geográfica             #
 #               Versión Python/Streamlit (MIGRACIÓN DESDE R)                 #
 # ============================================================================ #
+import sys
+import traceback
+
+try:
+    from modules.utils import (
+        safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
+        fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
+        registrar_log
+    )
+except Exception as e:
+    print(f"ERROR EN IMPORT: {e}")
+    traceback.print_exc()
+    sys.exit(1)
+
 
 import streamlit as st
 import pandas as pd
