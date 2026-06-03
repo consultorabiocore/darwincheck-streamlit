@@ -14,15 +14,22 @@ class GestorTaxonomia:
     """Gestiona consultas taxonómicas contra GBIF y SIMBIO."""
     
     def __init__(self):
-        self.simbio_df = pd.DataFrame()
-        self.cargar_simbio()
+        self.simbio_df = None  # Lazy loading
+        self.simbio_cargado = False
         self.cache_gbif = {}
     
     def cargar_simbio(self):
-        """Carga base de datos SIMBIO desde Excel."""
+        """Carga base de datos SIMBIO desde Excel (lazy loading)."""
+        if self.simbio_cargado:
+            return
+        
+        self.simbio_cargado = True
+        self.simbio_df = pd.DataFrame()
+        
         try:
             if SIMBIO_FILE.exists():
                 try:
+                    print(f"📂 Cargando SIMBIO desde {SIMBIO_FILE}...")
                     simbio_raw = pd.read_excel(
                         SIMBIO_FILE,
                         sheet_name='Especies',
@@ -79,6 +86,10 @@ class GestorTaxonomia:
     
     def buscar_simbio(self, genero, epiteto):
         """Busca especie en SIMBIO por género + epíteto."""
+        # Cargar SIMBIO si es necesario
+        if not self.simbio_cargado:
+            self.cargar_simbio()
+        
         if es_vacio(genero) or es_vacio(epiteto) or len(self.simbio_df) == 0:
             return None
         
@@ -173,5 +184,5 @@ class GestorTaxonomia:
         return self.resolver_taxonomia(genero, epiteto)
 
 
-# Instancia global
+# Instancia global (sin cargar SIMBIO en import)
 gestor_taxonomia = GestorTaxonomia()
