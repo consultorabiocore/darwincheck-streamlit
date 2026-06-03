@@ -174,9 +174,6 @@ def decimal_a_gms(decimal):
     
     return f"{grados}°{minutos}'{segundos:.2f}\"{signo}"
 
-
-def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
-
 def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
     """Registra mensajes en archivo log."""
     try:
