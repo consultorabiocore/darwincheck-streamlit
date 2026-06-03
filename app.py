@@ -307,8 +307,10 @@ def procesar_archivo(df_raw):
             for i in range(len(datos_corr))
         ]
         
-        # TAXONOMÍA
+        # TAXONOMÍA CON OPCIONES
         progress_bar = st.progress(0)
+        opciones_seleccionadas = {}
+        
         for idx, row in datos_corr.iterrows():
             if row['es_encabezado']:
                 continue
@@ -318,11 +320,15 @@ def procesar_archivo(df_raw):
                 row['epiteto_orig']
             )
             
+            # Aplicar corrección
             for col in ['reino', 'filo', 'clase', 'orden', 'familia', 'genero', 'epiteto']:
                 datos_corr.at[idx, f'{col}_corr'] = resultado[col]
             
             datos_corr.at[idx, 'fuente'] = resultado['fuente']
-            datos_corr.at[idx, 'estado_conservacion'] = resultado.get('estado_conservacion', '')
+            
+            # Guardar si hay coincidencias para selector
+            if resultado.get('coincidencias', []) and not resultado.get('exacta', False):
+                opciones_seleccionadas[idx] = resultado
             
             progress_bar.progress((idx + 1) / len(datos_corr))
         
@@ -336,6 +342,9 @@ def procesar_archivo(df_raw):
         datos_corr['estado_geografico'] = geo_df['estado']
         datos_corr['ubicacion_geografica'] = geo_df['ubicacion']
         datos_corr['notas'] = datos_corr['estado_geografico']
+        
+        # Guardar opciones en session state
+        st.session_state.opciones_taxonomia = opciones_seleccionadas
         
         return datos_corr
 
@@ -364,7 +373,6 @@ with st.expander("📋 Instrucciones de uso", expanded=True):
     - **Dominancia**: Distribución con Treemap
     - **Riqueza**: Número de especies (Lollipop)
     - **Curva de acumulación**: Rarefacción de especies
-    - **Conservación**: Estados de protección
     - **Datos**: Tabla completa con correcciones
     """)
 
@@ -425,13 +433,48 @@ if st.session_state.datos_corregidos is not None:
                  f"{fmt_decimal(indices['representatividad'], 1)}%",
                  delta_color=color_rep)
     with col9:
-        st.metric("🦊 Especie Dominante", "Ver gráficos")
+        # Especie dominante
+        especie_dominante = df_biodiv.groupby('especie')['valor'].sum().idxmax()
+        st.metric("🦊 Especie Dominante", especie_dominante.split()[-1])
+    
+    st.divider()
+    
+    # Selector de correcciones taxonómicas si hay ambigüedades
+    if 'opciones_taxonomia' in st.session_state and st.session_state.opciones_taxonomia:
+        st.markdown("### 🔧 Correcciones Taxonómicas Ambiguas")
+        st.info(f"Se encontraron {len(st.session_state.opciones_taxonomia)} especies con posibles correcciones. Selecciona las opciones correctas:")
+        
+        with st.form("form_taxonomia"):
+            for idx, opts in st.session_state.opciones_taxonomia.items():
+                genero_orig = st.session_state.datos_corregidos.at[idx, 'genero_orig']
+                epiteto_orig = st.session_state.datos_corregidos.at[idx, 'epiteto_orig']
+                
+                opciones = gestor_taxonomia.obtener_opciones_taxonomia(genero_orig, epiteto_orig)
+                nombres_opciones = [o['nombre'] for o in opciones]
+                
+                selected = st.selectbox(
+                    f"Fila {idx+1}: {genero_orig} {epiteto_orig}",
+                    nombres_opciones,
+                    key=f"taxonomia_{idx}"
+                )
+                
+                # Guardar selección
+                idx_seleccionado = nombres_opciones.index(selected)
+                st.session_state.selecciones_manuales[idx] = opciones[idx_seleccionado]['datos']
+            
+            if st.form_submit_button("✅ Aplicar Correcciones"):
+                # Aplicar correcciones seleccionadas
+                for idx, datos in st.session_state.selecciones_manuales.items():
+                    for col in ['reino', 'filo', 'clase', 'orden', 'familia', 'genero', 'epiteto']:
+                        st.session_state.datos_corregidos.at[idx, f'{col}_corr'] = datos.get(col, '')
+                st.success("✅ Correcciones aplicadas")
+                st.rerun()
     
     st.divider()
     
     # Tabs de análisis
-    tab_abundancia, tab_dominancia, tab_riqueza, tab_curva, tab_conservacion, tab_tabla = st.tabs(
-        ["📊 Abundancia", "🌰 Dominancia", "📈 Riqueza", "📉 Curva", "🛡️ Conservación", "📋 Datos"]
+    tab_abundancia, tab_dominancia, tab_riqueza, tab_curva, tab_tabla = st.tabs(
+        ["📊 Abundancia", "🌰 Dominancia", "📈 Riqueza", "📉 Curva", "📋 Datos"]
     )
     
     with tab_abundancia:
@@ -442,6 +485,7 @@ if st.session_state.datos_corregidos is not None:
     
     with tab_dominancia:
         st.markdown("### Treemap: Distribución de Abundancia")
+        resumen = df_biodiv.groupby('especie')['valor'].sum().reset_index()
         fig = gen_graficos.dominancia_treemap(resumen, col_especie='especie', col_valor='valor')
         st.plotly_chart(fig, use_container_width=True)
     
@@ -462,15 +506,6 @@ if st.session_state.datos_corregidos is not None:
             indices['chao1']
         )
         st.plotly_chart(fig, use_container_width=True)
-    
-    with tab_conservacion:
-        st.markdown("### Estados de Conservación")
-        if any(corr['estado_conservacion'] != ''):
-            conserv = corr[corr['estado_conservacion'] != ''].groupby('estado_conservacion').size().reset_index(name='count')
-            fig = gen_graficos.conservacion_barras(conserv, col_categoria='estado_conservacion', col_count='count')
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Sin registros de conservación")
     
     with tab_tabla:
         st.markdown("### Planilla Corregida")
