@@ -2,91 +2,131 @@
 #          DarwinCheck Vol.1 - Auditoría Taxonómica y Geográfica             #
 #               Versión Python/Streamlit (MIGRACIÓN DESDE R)                 #
 # ============================================================================ #
+
+import streamlit as st
+from pathlib import Path
 import sys
 import traceback
 
+# ==================== MOSTRAR ESTADO EN PANTALLA ====================
+status_placeholder = st.empty()
+
+def mostrar_estado(mensaje, tipo="info"):
+    """Muestra estado en tiempo real en la pantalla."""
+    if tipo == "error":
+        status_placeholder.error(f"❌ {mensaje}")
+    elif tipo == "success":
+        status_placeholder.success(f"✅ {mensaje}")
+    else:
+        status_placeholder.info(f"⏳ {mensaje}")
+
+# ==================== CONFIGURAR RUTA ====================
 try:
+    mostrar_estado("Configurando rutas...")
+    BASE_DIR = Path(__file__).parent
+    DATA_DIR = BASE_DIR / "data"
+    LOGS_DIR = BASE_DIR / "logs"
+    CACHE_DIR = BASE_DIR / "cache"
+    TEMP_DIR = BASE_DIR / "temp"
+    LOGO_FILE = BASE_DIR / "logo.png"
+    
+    sys.path.insert(0, str(BASE_DIR))
+    
+    for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
+        dir_path.mkdir(exist_ok=True)
+    
+    mostrar_estado("Rutas configuradas", "success")
+except Exception as e:
+    mostrar_estado(f"Error configurando rutas: {str(e)}", "error")
+    st.stop()
+
+# ==================== IMPORTS BÁSICOS ====================
+try:
+    mostrar_estado("Importando librerías básicas...")
+    import pandas as pd
+    import numpy as np
+    from datetime import datetime
+    from io import BytesIO
+    import warnings
+    warnings.filterwarnings('ignore')
+    mostrar_estado("Librerías básicas importadas", "success")
+except Exception as e:
+    mostrar_estado(f"Error en librerías básicas: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
+
+# ==================== IMPORTAR MÓDULOS (SIN LAZY LOADING) ====================
+try:
+    mostrar_estado("Importando modules.utils...")
     from modules.utils import (
         safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
         fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
         registrar_log
     )
+    mostrar_estado("modules.utils importado", "success")
 except Exception as e:
-    print(f"ERROR EN IMPORT: {e}")
-    traceback.print_exc()
-    sys.exit(1)
+    mostrar_estado(f"Error en modules.utils: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
 
+try:
+    mostrar_estado("Importando modules.config...")
+    from modules.config import (
+        SIMBIO_FILE, GBIF_API_BASE, GBIF_TIMEOUT,
+        CHILE_CONTINENTAL, RAPA_NUI, JUAN_FERNANDEZ
+    )
+    mostrar_estado("modules.config importado", "success")
+except Exception as e:
+    mostrar_estado(f"Error en modules.config: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from datetime import datetime
-import json
-from io import BytesIO
-import warnings
-import sys
+try:
+    mostrar_estado("Importando modules.coordenadas...")
+    from modules.coordenadas import validador
+    mostrar_estado("modules.coordenadas importado", "success")
+except Exception as e:
+    mostrar_estado(f"Error en modules.coordenadas: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
 
-warnings.filterwarnings('ignore')
+try:
+    mostrar_estado("Importando modules.ecologia...")
+    from modules.ecologia import calc_ecologico
+    mostrar_estado("modules.ecologia importado", "success")
+except Exception as e:
+    mostrar_estado(f"Error en modules.ecologia: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
 
-# ==================== CONFIGURAR RUTA ====================
-sys.path.insert(0, str(Path(__file__).parent))
+try:
+    mostrar_estado("Importando modules.graficos...")
+    from modules.graficos import gen_graficos
+    mostrar_estado("modules.graficos importado", "success")
+except Exception as e:
+    mostrar_estado(f"Error en modules.graficos: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
 
-# ==================== INICIALIZAR DIRECTORIOS PRIMERO ====================
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
-LOGS_DIR = BASE_DIR / "logs"
-CACHE_DIR = BASE_DIR / "cache"
-TEMP_DIR = BASE_DIR / "temp"
+try:
+    mostrar_estado("Importando modules.excel_io...")
+    from modules.excel_io import gestor_excel
+    mostrar_estado("modules.excel_io importado", "success")
+except Exception as e:
+    mostrar_estado(f"Error en modules.excel_io: {str(e)}", "error")
+    st.error(traceback.format_exc())
+    st.stop()
 
-for dir_path in [DATA_DIR, LOGS_DIR, CACHE_DIR, TEMP_DIR]:
-    dir_path.mkdir(exist_ok=True)
+try:
+    mostrar_estado("Importando modules.taxonomia (esto puede tardar)...")
+    from modules.taxonomia import gestor_taxonomia
+    mostrar_estado("modules.taxonomia importado", "success")
+except Exception as e:
+    mostrar_estado(f"Error en modules.taxonomia: {str(e)}", "error")
+    st.error(f"**Traceback completo:**\n```\n{traceback.format_exc()}\n```")
+    st.stop()
 
-# ==================== AHORA SÍ IMPORTAR MÓDULOS ====================
-from modules.utils import (
-    safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
-    fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
-    registrar_log
-)
-from modules.taxonomia import gestor_taxonomia
-from modules.coordenadas import validador
-from modules.ecologia import calc_ecologico
-from modules.graficos import gen_graficos
-from modules.excel_io import gestor_excel
-
-# Constantes de configuración
-LOGO_FILE = BASE_DIR / "logo.png"
-MSG_INICIO = """
-### 📖 ¿Cómo usar DarwinCheck Vol.1?
-
-**DarwinCheck** es una herramienta de auditoría taxonómica y geográfica para datos Darwin Core.
-
-#### 🎯 Pasos principales:
-
-1. **Cargar archivo Excel** con estructura Darwin Core (mínimo 34 columnas)
-2. **Seleccionar color** para los gráficos (opcional)
-3. El sistema automáticamente:
-    - ✅ Normaliza datos taxonómicos
-    - ✅ Valida coordenadas dentro de Chile
-    - ✅ Calcula índices ecológicos
-    - ✅ Genera reportes de auditoría
-
-#### 📊 Visualizaciones disponibles:
-- **Abundancia**: Especies más representadas
-- **Dominancia**: Distribución con Treemap
-- **Riqueza**: Número de especies (Lollipop)
-- **Curva de acumulación**: Rarefacción de especies
-- **Conservación**: Estados de protección
-- **Datos**: Tabla completa con correcciones
-
-#### 🛠️ Archivos soportados:
-- Formato: `.xlsx` o `.xls`
-- Mínimo: 34 columnas Darwin Core
-- Hoja requerida: "Ocurrencia"
-
-#### 📝 Contacto:
-BioCore © 2026 - Loreto Campos
-"""
+mostrar_estado("✅ TODOS LOS MÓDULOS CARGADOS CORRECTAMENTE", "success")
 
 # ==================== CONFIGURACIÓN STREAMLIT ====================
 st.set_page_config(
@@ -160,24 +200,14 @@ with st.sidebar:
     col_stats1, col_stats2 = st.columns(2)
     
     with col_stats1:
-        st.metric("SIMBIO", f"{len(gestor_taxonomia.simbio_df)} sp.", 
-                 delta="Nacional", delta_color="off")
+        try:
+            num_simbio = len(gestor_taxonomia.simbio_df) if gestor_taxonomia.simbio_df is not None else 0
+            st.metric("SIMBIO", f"{num_simbio} sp.", delta="Nacional", delta_color="off")
+        except:
+            st.metric("SIMBIO", "Error", delta_color="off")
     
     with col_stats2:
         st.metric("GBIF", "Activo", delta="Global", delta_color="off")
-    
-    st.divider()
-    
-    # Botón descarga
-    if st.session_state.datos_corregidos is not None:
-        btn_descarga = st.download_button(
-            label="⬇️ DESCARGAR EXCEL",
-            data=generar_excel_descarga(),
-            file_name=f"DarwinCheck_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            type="primary"
-        )
     
     st.divider()
     st.markdown("""
@@ -314,7 +344,29 @@ def procesar_archivo(df_raw):
 
 # Instrucciones
 with st.expander("📋 Instrucciones de uso", expanded=True):
-    st.markdown(MSG_INICIO)
+    st.markdown("""
+    ### 📖 ¿Cómo usar DarwinCheck Vol.1?
+
+    **DarwinCheck** es una herramienta de auditoría taxonómica y geográfica para datos Darwin Core.
+
+    #### 🎯 Pasos principales:
+
+    1. **Cargar archivo Excel** con estructura Darwin Core (mínimo 34 columnas)
+    2. **Seleccionar color** para los gráficos (opcional)
+    3. El sistema automáticamente:
+        - ✅ Normaliza datos taxonómicos
+        - ✅ Valida coordenadas dentro de Chile
+        - ✅ Calcula índices ecológicos
+        - ✅ Genera reportes de auditoría
+
+    #### 📊 Visualizaciones disponibles:
+    - **Abundancia**: Especies más representadas
+    - **Dominancia**: Distribución con Treemap
+    - **Riqueza**: Número de especies (Lollipop)
+    - **Curva de acumulación**: Rarefacción de especies
+    - **Conservación**: Estados de protección
+    - **Datos**: Tabla completa con correcciones
+    """)
 
 # Cargar archivo
 if archivo_cargado:
@@ -333,6 +385,7 @@ if archivo_cargado:
     
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
+        st.error(traceback.format_exc())
 
 # Mostrar métricas
 if st.session_state.datos_corregidos is not None:
@@ -377,8 +430,8 @@ if st.session_state.datos_corregidos is not None:
     st.divider()
     
     # Tabs de análisis
-    tab_abundancia, tab_dominancia, tab_riqueza, tab_curva, tab_conservacion, tab_tabla, tab_metodologia = st.tabs(
-        ["📊 Abundancia", "🌰 Dominancia", "📈 Riqueza", "📉 Curva", "🛡️ Conservación", "📋 Datos", "📘 Metodología"]
+    tab_abundancia, tab_dominancia, tab_riqueza, tab_curva, tab_conservacion, tab_tabla = st.tabs(
+        ["📊 Abundancia", "🌰 Dominancia", "📈 Riqueza", "📉 Curva", "🛡️ Conservación", "📋 Datos"]
     )
     
     with tab_abundancia:
@@ -386,12 +439,6 @@ if st.session_state.datos_corregidos is not None:
         resumen = df_biodiv.groupby('especie')['valor'].sum().reset_index()
         fig = gen_graficos.abundancia_top_especies(resumen, col_especie='especie', col_valor='valor')
         st.plotly_chart(fig, use_container_width=True)
-        st.download_button(
-            "⬇️ Descargar PNG",
-            key="download_abundancia",
-            file_name=f"abundancia_{datetime.now().strftime('%Y%m%d')}.png",
-            use_container_width=True
-        )
     
     with tab_dominancia:
         st.markdown("### Treemap: Distribución de Abundancia")
@@ -429,25 +476,14 @@ if st.session_state.datos_corregidos is not None:
         st.markdown("### Planilla Corregida")
         st.dataframe(st.session_state.datos_corregidos, use_container_width=True, height=600)
     
-    with tab_metodologia:
-        st.markdown("""
-        ## 🔬 Protocolo de Estandarización Darwin Core
-        
-        ### Funcionalidades
-        - ✅ Corrección taxonómica automática (SIMBIO + GBIF)
-        - ✅ Validación de coordenadas (Chile)
-        - ✅ Índices ecológicos completos
-        - ✅ Exportación con auditoría
-        
-        ### Proceso
-        1. **Limpieza** - Normalización de texto
-        2. **SIMBIO** - Búsqueda nacional
-        3. **GBIF** - Búsqueda global
-        4. **Validación** - Coordenadas y conservación
-        5. **Auditoría** - Columnas de trazabilidad
-        
-        © 2026 BioCore - Loreto Campos
-        """)
+    # Botón descarga
+    st.download_button(
+        label="⬇️ DESCARGAR EXCEL",
+        data=generar_excel_descarga(),
+        file_name=f"DarwinCheck_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
 else:
     st.info("👈 Carga un archivo Excel en el panel lateral para comenzar")
