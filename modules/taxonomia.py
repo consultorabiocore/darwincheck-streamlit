@@ -112,7 +112,7 @@ class GestorTaxonomia:
                         'genero': safe_val(data.get('genus')),
                         'epiteto': safe_val(data.get('specificEpithet')),
                         'nombre_comun': '',
-                        'fuente': 'GBIF'
+                        'fuente': '✅ GBIF'
                     }
         
         except Exception as e:
@@ -169,6 +169,26 @@ class GestorTaxonomia:
         ]
         
         return resultados.to_dict('records') if len(resultados) > 0 else []
+    
+    def completar_con_gbif(self, resultado_simbio, genero, epiteto):
+        """Completa campos vacíos desde GBIF."""
+        if not resultado_simbio or resultado_simbio.get('fuente', '').startswith('GBIF'):
+            return resultado_simbio
+        
+        # Si hay campos vacíos en SIMBIO, intentar llenarlos con GBIF
+        campos_vacios = [
+            key for key in ['reino', 'filo', 'clase', 'orden', 'familia']
+            if es_vacio(resultado_simbio.get(key, ''))
+        ]
+        
+        if campos_vacios:
+            gbif_data = self.consultar_gbif(genero, epiteto)
+            if gbif_data:
+                for campo in campos_vacios:
+                    resultado_simbio[campo] = gbif_data.get(campo, '')
+                resultado_simbio['fuente'] = resultado_simbio.get('fuente', '') + ' + GBIF'
+        
+        return resultado_simbio
     
     def obtener_opciones_taxonomia(self, genero, epiteto):
         """Retorna lista de opciones de corrección para selector interactivo."""
@@ -260,6 +280,8 @@ class GestorTaxonomia:
         # PASO 1: Búsqueda exacta en SIMBIO
         resultado = self.buscar_simbio_exacta(genero, epiteto)
         if resultado:
+            # Completar campos vacíos con GBIF
+            resultado = self.completar_con_gbif(resultado, genero, epiteto)
             return resultado
         
         # PASO 2A: Si género vacío, buscar por epíteto
@@ -267,7 +289,7 @@ class GestorTaxonomia:
             por_epiteto = self.buscar_por_epiteto(epiteto)
             if len(por_epiteto) == 1:
                 rec = por_epiteto[0]
-                return {
+                resultado = {
                     'reino': rec['reino'],
                     'filo': rec['filo'],
                     'clase': rec['clase'],
@@ -278,6 +300,8 @@ class GestorTaxonomia:
                     'nombre_comun': rec['Nombre_Comun'],
                     'fuente': '✅ SIMBIO (EPÍTETO)'
                 }
+                resultado = self.completar_con_gbif(resultado, rec['genero'], rec['epiteto'])
+                return resultado
             elif len(por_epiteto) > 1:
                 # Múltiples opciones - marca para revisión manual
                 return {
@@ -299,7 +323,7 @@ class GestorTaxonomia:
             por_genero = self.buscar_por_genero(genero)
             if len(por_genero) == 1:
                 rec = por_genero[0]
-                return {
+                resultado = {
                     'reino': rec['reino'],
                     'filo': rec['filo'],
                     'clase': rec['clase'],
@@ -310,6 +334,8 @@ class GestorTaxonomia:
                     'nombre_comun': rec['Nombre_Comun'],
                     'fuente': '✅ SIMBIO (GÉNERO)'
                 }
+                resultado = self.completar_con_gbif(resultado, genero, epiteto)
+                return resultado
             elif len(por_genero) > 1:
                 # Múltiples opciones - marca para revisión manual
                 return {
