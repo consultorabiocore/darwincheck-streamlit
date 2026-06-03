@@ -61,7 +61,7 @@ try:
     from modules.utils import (
         safe_val, normalizar_texto, limpiar_dataframe, fmt_entero, fmt_decimal,
         fmt_coordenada, detectar_encabezado, formatar_hora, gms_a_decimal,
-        registrar_log
+        registrar_log, es_vacio
     )
     mostrar_estado("modules.utils importado", "success")
 except Exception as e:
@@ -128,6 +128,15 @@ except Exception as e:
 
 mostrar_estado("✅ TODOS LOS MÓDULOS CARGADOS CORRECTAMENTE", "success")
 
+# ==================== CARGAR SIMBIO AL INICIO ====================
+try:
+    mostrar_estado("Cargando SIMBIO (base de datos nacional)...")
+    gestor_taxonomia.cargar_simbio()
+    num_simbio = len(gestor_taxonomia.simbio_df) if gestor_taxonomia.simbio_df is not None else 0
+    mostrar_estado(f"✅ SIMBIO cargado: {num_simbio} especies", "success")
+except Exception as e:
+    mostrar_estado(f"⚠️ Error cargando SIMBIO: {str(e)}", "info")
+
 # ==================== CONFIGURACIÓN STREAMLIT ====================
 st.set_page_config(
     page_title="DarwinCheck Vol.1",
@@ -156,6 +165,7 @@ if 'datos_originales' not in st.session_state:
     st.session_state.datos_corregidos = None
     st.session_state.selecciones_manuales = {}
     st.session_state.color_grafico = "#27ae60"
+    st.session_state.opciones_taxonomia = {}
 
 # ==================== HEADER ====================
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -201,7 +211,7 @@ with st.sidebar:
     
     with col_stats1:
         try:
-            num_simbio = len(gestor_taxonomia.simbio_df) if gestor_taxonomia.simbio_df is not None else 0
+            num_simbio = len(gestor_taxonomia.simbio_df) if gestor_taxonomia.simbio_df is not None and len(gestor_taxonomia.simbio_df) > 0 else 0
             st.metric("SIMBIO", f"{num_simbio} sp.", delta="Nacional", delta_color="off")
         except:
             st.metric("SIMBIO", "Error", delta_color="off")
@@ -239,7 +249,7 @@ def generar_excel_descarga():
         
         # Agregar columnas auditoría
         df_export['ESTADO_GEOGRAFICO'] = corr['estado_geografico'].values
-        df_export['NOTAS_AUDITORIA'] = corr['notas'].values
+        df_export['NOTAS_AUDITORIA'] = corr['fuente'].values
         
         # Escribir a BytesIO
         output = BytesIO()
@@ -255,6 +265,11 @@ def generar_excel_descarga():
 
 def procesar_archivo(df_raw):
     """Procesa archivo y ejecuta correcciones taxonómicas."""
+    
+    # Asegurarse de que SIMBIO esté cargado
+    if not gestor_taxonomia.simbio_cargado:
+        with st.spinner("⏳ Cargando SIMBIO..."):
+            gestor_taxonomia.cargar_simbio()
     
     with st.spinner("⏳ Procesando archivo..."):
         # Inicializar dataframe de resultados
@@ -307,30 +322,41 @@ def procesar_archivo(df_raw):
             for i in range(len(datos_corr))
         ]
         
-        # TAXONOMÍA CON OPCIONES
+        # TAXONOMÍA - PASO 1: SIMBIO EXACTA
         progress_bar = st.progress(0)
-        opciones_seleccionadas = {}
+        status_text = st.empty()
+        opciones_para_revision = {}
         
         for idx, row in datos_corr.iterrows():
             if row['es_encabezado']:
                 continue
             
-            resultado = gestor_taxonomia.resolver_taxonomia(
-                row['genero_orig'],
-                row['epiteto_orig']
-            )
+            genero = safe_val(row['genero_orig'])
+            epiteto = safe_val(row['epiteto_orig'])
+            
+            if es_vacio(genero) and es_vacio(epiteto):
+                progress_bar.progress((idx + 1) / len(datos_corr))
+                continue
+            
+            # Resolver taxonomía
+            resultado = gestor_taxonomia.resolver_taxonomia(genero, epiteto)
             
             # Aplicar corrección
             for col in ['reino', 'filo', 'clase', 'orden', 'familia', 'genero', 'epiteto']:
-                datos_corr.at[idx, f'{col}_corr'] = resultado[col]
+                valor = resultado.get(col, '')
+                datos_corr.at[idx, f'{col}_corr'] = safe_val(valor) if valor else ''
             
-            datos_corr.at[idx, 'fuente'] = resultado['fuente']
+            # Guardar fuente
+            datos_corr.at[idx, 'fuente'] = resultado.get('fuente', 'NO_ENCONTRADO')
             
-            # Guardar si hay coincidencias para selector
-            if resultado.get('coincidencias', []) and not resultado.get('exacta', False):
-                opciones_seleccionadas[idx] = resultado
+            # Si necesita revisión manual
+            if resultado.get('necesita_revision', False):
+                opciones_para_revision[idx] = resultado
             
+            status_text.text(f"Procesando fila {idx + 1} de {len(datos_corr)}...")
             progress_bar.progress((idx + 1) / len(datos_corr))
+        
+        status_text.empty()
         
         # VALIDACIÓN GEOGRÁFICA
         validaciones_geo = []
@@ -341,10 +367,9 @@ def procesar_archivo(df_raw):
         geo_df = pd.DataFrame(validaciones_geo)
         datos_corr['estado_geografico'] = geo_df['estado']
         datos_corr['ubicacion_geografica'] = geo_df['ubicacion']
-        datos_corr['notas'] = datos_corr['estado_geografico']
         
         # Guardar opciones en session state
-        st.session_state.opciones_taxonomia = opciones_seleccionadas
+        st.session_state.opciones_taxonomia = opciones_para_revision
         
         return datos_corr
 
@@ -433,16 +458,33 @@ if st.session_state.datos_corregidos is not None:
                  f"{fmt_decimal(indices['representatividad'], 1)}%",
                  delta_color=color_rep)
     with col9:
-        # Especie dominante
-        especie_dominante = df_biodiv.groupby('especie')['valor'].sum().idxmax()
-        st.metric("🦊 Especie Dominante", especie_dominante.split()[-1])
+        if len(df_biodiv) > 0:
+            especie_dominante = df_biodiv.groupby('especie')['valor'].sum().idxmax()
+            st.metric("🦊 Especie Dominante", especie_dominante.split()[-1])
+        else:
+            st.metric("🦊 Especie Dominante", "Sin datos")
+    
+    st.divider()
+    
+    # Mostrar correcciones aplicadas
+    correcciones_aplicadas = st.session_state.datos_corregidos[
+        st.session_state.datos_corregidos['fuente'].str.contains('SIMBIO|GBIF', na=False)
+    ]
+    
+    if len(correcciones_aplicadas) > 0:
+        st.markdown(f"### ✅ Correcciones Aplicadas ({len(correcciones_aplicadas)} registros)")
+        st.info(f"Se aplicaron correcciones taxonómicas a **{len(correcciones_aplicadas)}** registros")
+        
+        # Mostrar tabla resumen de correcciones
+        resumen_correcciones = correcciones_aplicadas[['genero_orig', 'epiteto_orig', 'genero_corr', 'epiteto_corr', 'fuente']].head(10)
+        st.dataframe(resumen_correcciones, use_container_width=True)
     
     st.divider()
     
     # Selector de correcciones taxonómicas si hay ambigüedades
-    if 'opciones_taxonomia' in st.session_state and st.session_state.opciones_taxonomia:
-        st.markdown("### 🔧 Correcciones Taxonómicas Ambiguas")
-        st.info(f"Se encontraron {len(st.session_state.opciones_taxonomia)} especies con posibles correcciones. Selecciona las opciones correctas:")
+    if st.session_state.opciones_taxonomia:
+        st.markdown("### 🔧 Correcciones Taxonómicas que Requieren Revisión Manual")
+        st.warning(f"Se encontraron {len(st.session_state.opciones_taxonomia)} registros con múltiples opciones de corrección.")
         
         with st.form("form_taxonomia"):
             for idx, opts in st.session_state.opciones_taxonomia.items():
@@ -462,12 +504,12 @@ if st.session_state.datos_corregidos is not None:
                 idx_seleccionado = nombres_opciones.index(selected)
                 st.session_state.selecciones_manuales[idx] = opciones[idx_seleccionado]['datos']
             
-            if st.form_submit_button("✅ Aplicar Correcciones"):
+            if st.form_submit_button("✅ Aplicar Correcciones Manuales"):
                 # Aplicar correcciones seleccionadas
                 for idx, datos in st.session_state.selecciones_manuales.items():
                     for col in ['reino', 'filo', 'clase', 'orden', 'familia', 'genero', 'epiteto']:
                         st.session_state.datos_corregidos.at[idx, f'{col}_corr'] = datos.get(col, '')
-                st.success("✅ Correcciones aplicadas")
+                st.success("✅ Correcciones manuales aplicadas")
                 st.rerun()
     
     st.divider()
