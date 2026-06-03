@@ -124,8 +124,8 @@ def gms_a_decimal(coord_str):
     
     # Reemplazar caracteres especiales
     coord_str = re.sub(r'[°º]', ' ', coord_str)
-    coord_str = re.sub(r'[\'']', ' ', coord_str)
-    coord_str = re.sub(r'[""]', ' ', coord_str)
+    coord_str = re.sub(r"[''´`]", ' ', coord_str)
+    coord_str = re.sub(r'[""‟]', ' ', coord_str)
     coord_str = re.sub(r'[NSEWnsew]', ' ', coord_str)
     coord_str = re.sub(r'[:;/]', ' ', coord_str)
     
