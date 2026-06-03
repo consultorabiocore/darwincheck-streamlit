@@ -174,12 +174,10 @@ def decimal_a_gms(decimal):
     
     return f"{grados}°{minutos}'{segundos:.2f}\"{signo}"
 
+
 def registrar_log(mensaje, tipo='info', archivo='auditoria.log'):
     """Registra mensajes en archivo log."""
     try:
-        # NO importar modules.config, usar Path directamente
-        from pathlib import Path
-        
         log_dir = Path(__file__).parent.parent / "logs"
         log_dir.mkdir(exist_ok=True)
         
