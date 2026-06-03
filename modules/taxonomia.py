@@ -7,7 +7,6 @@ import numpy as np
 import requests
 import json
 from functools import lru_cache
-from difflib import SequenceMatcher
 from modules.config import SIMBIO_FILE, GBIF_API_BASE, GBIF_TIMEOUT
 from modules.utils import safe_val, normalizar_texto, es_vacio
 
@@ -42,23 +41,24 @@ class GestorTaxonomia:
                     
                     # Crear dataframe procesado
                     self.simbio_df = pd.DataFrame({
-                        'nombre_cientifico': (
+                        'Nombre_Cientifico': (
                             simbio_raw.get('Género', '') + ' ' + 
                             simbio_raw.get('Epíteto específico', '')
                         ),
-                        'estado_conservacion': simbio_raw.get('Estado de Conservación vigente', ''),
-                        'nombre_comun': simbio_raw.get('Nombre común', ''),
+                        'Estado_Conservacion': simbio_raw.get('Estado de Conservación vigente', ''),
+                        'Nombre_Comun': simbio_raw.get('Nombre común', ''),
                         'reino': simbio_raw.get('Reino', ''),
                         'filo': simbio_raw.get('Filo o División', ''),
                         'clase': simbio_raw.get('Clase', ''),
                         'orden': simbio_raw.get('Orden', ''),
                         'familia': simbio_raw.get('Familia', ''),
                         'genero': simbio_raw.get('Género', ''),
+                        'epiteto': simbio_raw.get('Epíteto específico', ''),
                     })
                     
                     # Normalizar para búsqueda
                     self.simbio_df['nombre_busqueda'] = (
-                        self.simbio_df['nombre_cientifico'].apply(
+                        self.simbio_df['Nombre_Cientifico'].apply(
                             lambda x: normalizar_texto(x)
                         )
                     )
@@ -84,70 +84,6 @@ class GestorTaxonomia:
         except Exception as e:
             print(f"⚠️ Error inicializando SIMBIO: {e}")
             self.simbio_df = pd.DataFrame()
-    
-    def similitud(self, texto1, texto2):
-        """Calcula similitud entre dos textos (0-1)."""
-        return SequenceMatcher(None, texto1, texto2).ratio()
-    
-    def buscar_simbio_exacta(self, genero, epiteto):
-        """Busca especie exacta en SIMBIO."""
-        if es_vacio(genero) or es_vacio(epiteto) or len(self.simbio_df) == 0:
-            return None
-        
-        nombre = normalizar_texto(f"{genero} {epiteto}")
-        
-        # Búsqueda exacta
-        resultados = self.simbio_df[
-            self.simbio_df['nombre_busqueda'] == nombre
-        ]
-        
-        if len(resultados) > 0:
-            fila = resultados.iloc[0]
-            return {
-                'reino': safe_val(fila['reino']),
-                'filo': safe_val(fila['filo']),
-                'clase': safe_val(fila['clase']),
-                'orden': safe_val(fila['orden']),
-                'familia': safe_val(fila['familia']),
-                'genero': safe_val(fila['genero']),
-                'epiteto': safe_val(epiteto),
-                'nombre_comun': safe_val(fila['nombre_comun']),
-                'fuente': 'SIMBIO',
-                'exacta': True
-            }
-        
-        return None
-    
-    def buscar_simbio_difusa(self, genero, epiteto, umbral=0.7):
-        """Busca especie con similitud difusa (fuzzy matching)."""
-        if es_vacio(genero) or es_vacio(epiteto) or len(self.simbio_df) == 0:
-            return []
-        
-        nombre_objetivo = normalizar_texto(f"{genero} {epiteto}")
-        coincidencias = []
-        
-        for idx, row in self.simbio_df.iterrows():
-            nombre_simbio = row['nombre_busqueda']
-            similitud_score = self.similitud(nombre_objetivo, nombre_simbio)
-            
-            if similitud_score >= umbral:
-                coincidencias.append({
-                    'score': similitud_score,
-                    'nombre': row['nombre_cientifico'],
-                    'reino': safe_val(row['reino']),
-                    'filo': safe_val(row['filo']),
-                    'clase': safe_val(row['clase']),
-                    'orden': safe_val(row['orden']),
-                    'familia': safe_val(row['familia']),
-                    'genero': safe_val(row['genero']),
-                    'epiteto': safe_val(row['nombre_cientifico'].split()[-1]),
-                    'nombre_comun': safe_val(row['nombre_comun']),
-                    'fuente': 'SIMBIO'
-                })
-        
-        # Ordenar por similitud descendente
-        coincidencias = sorted(coincidencias, key=lambda x: x['score'], reverse=True)
-        return coincidencias[:5]  # Retornar máximo 5 opciones
     
     @lru_cache(maxsize=1000)
     def consultar_gbif(self, genero, epiteto):
@@ -176,8 +112,7 @@ class GestorTaxonomia:
                         'genero': safe_val(data.get('genus')),
                         'epiteto': safe_val(data.get('specificEpithet')),
                         'nombre_comun': '',
-                        'fuente': 'GBIF',
-                        'exacta': True
+                        'fuente': 'GBIF'
                     }
         
         except Exception as e:
@@ -185,89 +120,121 @@ class GestorTaxonomia:
         
         return None
     
-    def resolver_taxonomia(self, genero, epiteto):
-        """Resuelve taxonomía: primero SIMBIO exacta, luego GBIF, luego SIMBIO difusa."""
-        # Cargar SIMBIO si es necesario
-        if not self.simbio_cargado:
-            self.cargar_simbio()
+    def buscar_simbio_exacta(self, genero, epiteto):
+        """PASO 1: Búsqueda exacta nombre completo (género + epíteto)."""
+        if es_vacio(genero) or es_vacio(epiteto) or len(self.simbio_df) == 0:
+            return None
         
-        # 1. Intentar búsqueda exacta en SIMBIO
-        resultado = self.buscar_simbio_exacta(genero, epiteto)
-        if resultado:
-            return resultado
+        nombre = normalizar_texto(f"{genero} {epiteto}")
+        resultados = self.simbio_df[
+            self.simbio_df['nombre_busqueda'] == nombre
+        ]
         
-        # 2. Fallback a GBIF
-        resultado = self.consultar_gbif(genero, epiteto)
-        if resultado:
-            return resultado
-        
-        # 3. Búsqueda difusa en SIMBIO (si no encontró exacta)
-        coincidencias = self.buscar_simbio_difusa(genero, epiteto, umbral=0.65)
-        if coincidencias:
-            # Retornar la mejor coincidencia
-            mejor = coincidencias[0]
+        if len(resultados) > 0:
+            fila = resultados.iloc[0]
             return {
-                'reino': mejor['reino'],
-                'filo': mejor['filo'],
-                'clase': mejor['clase'],
-                'orden': mejor['orden'],
-                'familia': mejor['familia'],
-                'genero': mejor['genero'],
-                'epiteto': mejor['epiteto'],
-                'nombre_comun': mejor['nombre_comun'],
-                'fuente': 'SIMBIO_DIFUSA',
-                'exacta': False,
-                'coincidencias': coincidencias  # Pasar opciones para selector
+                'reino': safe_val(fila['reino']),
+                'filo': safe_val(fila['filo']),
+                'clase': safe_val(fila['clase']),
+                'orden': safe_val(fila['orden']),
+                'familia': safe_val(fila['familia']),
+                'genero': safe_val(fila['genero']),
+                'epiteto': safe_val(fila['epiteto']),
+                'nombre_comun': safe_val(fila['Nombre_Comun']),
+                'fuente': '✅ SIMBIO (EXACTO)'
             }
         
-        # No encontrado
-        return {
-            'reino': '',
-            'filo': '',
-            'clase': '',
-            'orden': '',
-            'familia': '',
-            'genero': safe_val(genero),
-            'epiteto': safe_val(epiteto),
-            'nombre_comun': '',
-            'fuente': 'NO_ENCONTRADO',
-            'exacta': False,
-            'coincidencias': []
-        }
+        return None
+    
+    def buscar_por_epiteto(self, epiteto):
+        """PASO 2A: Búsqueda por epíteto específico (si género vacío)."""
+        if es_vacio(epiteto) or len(self.simbio_df) == 0:
+            return []
+        
+        epi_norm = normalizar_texto(epiteto)
+        resultados = self.simbio_df[
+            self.simbio_df['epiteto'].apply(lambda x: normalizar_texto(x)) == epi_norm
+        ]
+        
+        return resultados.to_dict('records') if len(resultados) > 0 else []
+    
+    def buscar_por_genero(self, genero):
+        """PASO 2B: Búsqueda por género (si epíteto vacío o no coincide)."""
+        if es_vacio(genero) or len(self.simbio_df) == 0:
+            return []
+        
+        gen_norm = normalizar_texto(genero)
+        resultados = self.simbio_df[
+            self.simbio_df['genero'].apply(lambda x: normalizar_texto(x)) == gen_norm
+        ]
+        
+        return resultados.to_dict('records') if len(resultados) > 0 else []
     
     def obtener_opciones_taxonomia(self, genero, epiteto):
-        """Obtiene opciones de corrección para selector interactivo."""
+        """Retorna lista de opciones de corrección para selector interactivo."""
         if not self.simbio_cargado:
             self.cargar_simbio()
         
         opciones = []
         
-        # Búsqueda exacta
+        # PASO 1: Búsqueda exacta
         exacta = self.buscar_simbio_exacta(genero, epiteto)
         if exacta:
             opciones.append({
-                'nombre': f"{exacta['genero']} {exacta['epiteto']} (SIMBIO - EXACTA)",
+                'nombre': f"{exacta['genero']} {exacta['epiteto']} | {exacta['orden']} (SIMBIO - EXACTO)",
                 'datos': exacta
             })
+            return opciones  # Si hay exacta, retornar solo esa
         
-        # Búsqueda difusa
-        difusas = self.buscar_simbio_difusa(genero, epiteto, umbral=0.65)
-        for coinc in difusas:
-            if coinc['nombre'] not in [o['nombre'] for o in opciones]:
+        # PASO 2: Búsquedas parciales
+        # 2A: Por epíteto si género vacío
+        if es_vacio(genero) and not es_vacio(epiteto):
+            por_epiteto = self.buscar_por_epiteto(epiteto)
+            for rec in por_epiteto[:5]:  # Máximo 5 opciones
                 opciones.append({
-                    'nombre': f"{coinc['nombre']} (similitud: {coinc['score']:.0%})",
-                    'datos': coinc
+                    'nombre': f"{rec['genero']} {rec['epiteto']} | {rec['orden']} (SIMBIO - EPÍTETO)",
+                    'datos': {
+                        'reino': rec['reino'],
+                        'filo': rec['filo'],
+                        'clase': rec['clase'],
+                        'orden': rec['orden'],
+                        'familia': rec['familia'],
+                        'genero': rec['genero'],
+                        'epiteto': rec['epiteto'],
+                        'nombre_comun': rec['Nombre_Comun'],
+                        'fuente': '✅ SIMBIO (EPÍTETO)'
+                    }
                 })
         
-        # GBIF
-        gbif = self.consultar_gbif(genero, epiteto)
-        if gbif:
-            opciones.append({
-                'nombre': f"{gbif['genero']} {gbif['epiteto']} (GBIF)",
-                'datos': gbif
-            })
+        # 2B: Por género si no hay coincidencia exacta
+        if not es_vacio(genero):
+            por_genero = self.buscar_por_genero(genero)
+            for rec in por_genero[:5]:  # Máximo 5 opciones
+                opciones.append({
+                    'nombre': f"{rec['genero']} {rec['epiteto']} | {rec['orden']} (SIMBIO - GÉNERO)",
+                    'datos': {
+                        'reino': rec['reino'],
+                        'filo': rec['filo'],
+                        'clase': rec['clase'],
+                        'orden': rec['orden'],
+                        'familia': rec['familia'],
+                        'genero': rec['genero'],
+                        'epiteto': rec['epiteto'],
+                        'nombre_comun': rec['Nombre_Comun'],
+                        'fuente': '✅ SIMBIO (GÉNERO)'
+                    }
+                })
         
-        # Opción de dejar original
+        # PASO 3: GBIF (solo si no hay muchas opciones de SIMBIO)
+        if len(opciones) < 3:
+            gbif = self.consultar_gbif(genero, epiteto)
+            if gbif:
+                opciones.append({
+                    'nombre': f"{gbif['genero']} {gbif['epiteto']} (GBIF)",
+                    'datos': gbif
+                })
+        
+        # Opción: Sin corregir
         opciones.append({
             'nombre': f"{safe_val(genero)} {safe_val(epiteto)} (SIN CORREGIR)",
             'datos': {
@@ -278,11 +245,104 @@ class GestorTaxonomia:
                 'clase': '',
                 'orden': '',
                 'familia': '',
+                'nombre_comun': '',
                 'fuente': 'NO_CORREGIDO'
             }
         })
         
         return opciones if opciones else []
+    
+    def resolver_taxonomia(self, genero, epiteto):
+        """Resuelve taxonomía: SIMBIO exacta → por epíteto → por género → GBIF → original."""
+        if not self.simbio_cargado:
+            self.cargar_simbio()
+        
+        # PASO 1: Búsqueda exacta en SIMBIO
+        resultado = self.buscar_simbio_exacta(genero, epiteto)
+        if resultado:
+            return resultado
+        
+        # PASO 2A: Si género vacío, buscar por epíteto
+        if es_vacio(genero) and not es_vacio(epiteto):
+            por_epiteto = self.buscar_por_epiteto(epiteto)
+            if len(por_epiteto) == 1:
+                rec = por_epiteto[0]
+                return {
+                    'reino': rec['reino'],
+                    'filo': rec['filo'],
+                    'clase': rec['clase'],
+                    'orden': rec['orden'],
+                    'familia': rec['familia'],
+                    'genero': rec['genero'],
+                    'epiteto': rec['epiteto'],
+                    'nombre_comun': rec['Nombre_Comun'],
+                    'fuente': '✅ SIMBIO (EPÍTETO)'
+                }
+            elif len(por_epiteto) > 1:
+                # Múltiples opciones - marca para revisión manual
+                return {
+                    'genero': safe_val(genero),
+                    'epiteto': safe_val(epiteto),
+                    'reino': '',
+                    'filo': '',
+                    'clase': '',
+                    'orden': '',
+                    'familia': '',
+                    'nombre_comun': '',
+                    'fuente': f'⚠️ SIMBIO EPÍTETO ({len(por_epiteto)} opciones)',
+                    'necesita_revision': True,
+                    'opciones': por_epiteto
+                }
+        
+        # PASO 2B: Búsqueda por género
+        if not es_vacio(genero):
+            por_genero = self.buscar_por_genero(genero)
+            if len(por_genero) == 1:
+                rec = por_genero[0]
+                return {
+                    'reino': rec['reino'],
+                    'filo': rec['filo'],
+                    'clase': rec['clase'],
+                    'orden': rec['orden'],
+                    'familia': rec['familia'],
+                    'genero': rec['genero'],
+                    'epiteto': rec['epiteto'],
+                    'nombre_comun': rec['Nombre_Comun'],
+                    'fuente': '✅ SIMBIO (GÉNERO)'
+                }
+            elif len(por_genero) > 1:
+                # Múltiples opciones - marca para revisión manual
+                return {
+                    'genero': safe_val(genero),
+                    'epiteto': safe_val(epiteto),
+                    'reino': '',
+                    'filo': '',
+                    'clase': '',
+                    'orden': '',
+                    'familia': '',
+                    'nombre_comun': '',
+                    'fuente': f'⚠️ SIMBIO GÉNERO ({len(por_genero)} opciones)',
+                    'necesita_revision': True,
+                    'opciones': por_genero
+                }
+        
+        # PASO 3: Fallback a GBIF
+        resultado = self.consultar_gbif(genero, epiteto)
+        if resultado:
+            return resultado
+        
+        # No encontrado - retornar original
+        return {
+            'reino': '',
+            'filo': '',
+            'clase': '',
+            'orden': '',
+            'familia': '',
+            'genero': safe_val(genero),
+            'epiteto': safe_val(epiteto),
+            'nombre_comun': '',
+            'fuente': 'NO_ENCONTRADO'
+        }
 
 
 # Instancia global (sin cargar SIMBIO en import)
