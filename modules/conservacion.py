@@ -10,7 +10,7 @@ class GestorConservacion:
     """Gestiona datos de estados de conservación de especies."""
     
     def __init__(self):
-        self.estados_conocidos = {
+        self.estados_iucn = {
             'EN': 'En Peligro (EN)',
             'VU': 'Vulnerable (VU)',
             'CR': 'En Peligro Crítico (CR)',
@@ -20,82 +20,58 @@ class GestorConservacion:
             'EX': 'Extinto (EX)',
             'EW': 'Extinto en Estado Silvestre (EW)',
         }
-        # Mapeo de categorías en español a códigos IUCN
-        self.mapeo_conservacion = {
-            'en peligro': 'EN',
-            'vulnerable': 'VU',
-            'peligro crítico': 'CR',
-            'casi amenazado': 'NT',
-            'preocupación menor': 'LC',
-            'datos insuficientes': 'DD',
-            'extinto': 'EX',
-            'extinto en estado silvestre': 'EW',
-            'amenazado': 'VU',
-            'protegida': 'VU',
-            'endangered': 'EN',
-            'vulnerable': 'VU',
-            'critically endangered': 'CR',
-            'near threatened': 'NT',
-            'least concern': 'LC',
-            'data deficient': 'DD',
-        }
     
-    def obtener_estado_desde_simbio(self, estado_texto):
-        """Obtiene estado de conservación desde SIMBIO."""
+    def normalizar_estado(self, estado_texto):
+        """Normaliza estado de conservación desde diferentes fuentes."""
         if es_vacio(estado_texto):
             return ''
         
-        estado_norm = normalizar_texto(str(estado_texto))
+        estado = normalizar_texto(str(estado_texto))
         
-        # Buscar coincidencia exacta
-        for texto, codigo in self.mapeo_conservacion.items():
-            if texto in estado_norm:
+        # Mapeos comunes
+        mapeos = {
+            'en peligro': 'EN',
+            'endangered': 'EN',
+            'vulnerable': 'VU',
+            'peligro critico': 'CR',
+            'critically endangered': 'CR',
+            'casi amenazado': 'NT',
+            'near threatened': 'NT',
+            'preocupacion menor': 'LC',
+            'least concern': 'LC',
+            'datos insuficientes': 'DD',
+            'data deficient': 'DD',
+            'extinto': 'EX',
+            'extinct': 'EX',
+            'amenazado': 'VU',
+            'threatened': 'VU',
+            'protegida': 'VU',
+        }
+        
+        # Búsqueda por clave
+        for clave, codigo in mapeos.items():
+            if clave in estado:
                 return codigo
         
-        # Retornar tal cual si tiene valor
-        return safe_val(estado_texto)
+        # Si es código IUCN válido, devolverlo
+        if estado.upper() in self.estados_iucn:
+            return estado.upper()
+        
+        # Retornar original si tiene valor
+        return safe_val(estado_texto) if not es_vacio(estado_texto) else ''
     
     def obtener_categoria_completa(self, codigo):
         """Obtiene la categoría completa desde el código."""
-        return self.estados_conocidos.get(codigo, codigo)
+        return self.estados_iucn.get(codigo if isinstance(codigo, str) else str(codigo), codigo)
+    
+    def es_amenazado(self, codigo):
+        """Verifica si una especie está amenazada (EN, VU, CR)."""
+        amenazados = {'EN', 'VU', 'CR'}
+        return str(codigo).upper() in amenazados
     
     def tiene_conservacion(self, estado):
         """Verifica si tiene información de conservación."""
         return not es_vacio(estado)
-    
-    def clasificar_por_estado(self, df, col_estado='estado_conservacion'):
-        """Clasifica un dataframe por estado de conservación."""
-        if col_estado not in df.columns:
-            return {}
-        
-        grupos = {}
-        for idx, row in df.iterrows():
-            estado = safe_val(row[col_estado])
-            if not es_vacio(estado):
-                if estado not in grupos:
-                    grupos[estado] = []
-                grupos[estado].append(idx)
-        
-        return grupos
-    
-    def generar_resumen(self, df, col_especie='especie', col_estado='estado_conservacion'):
-        """Genera resumen de conservación por especies."""
-        if col_estado not in df.columns:
-            return pd.DataFrame()
-        
-        # Filtrar filas con conservación
-        df_con = df[df[col_estado].notna() & (df[col_estado] != '')]
-        
-        if df_con.empty:
-            return pd.DataFrame()
-        
-        # Agrupar por estado
-        resumen = df_con.groupby(col_estado).size().reset_index(name='cantidad')
-        
-        # Mapear a categorías completas
-        resumen['categoria'] = resumen[col_estado].apply(self.obtener_categoria_completa)
-        
-        return resumen.sort_values('cantidad', ascending=False)
 
 
 # Instancia global
